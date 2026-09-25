@@ -1,0 +1,18 @@
+[package]
+name = "wcad-doc"
+description = "webcad document model: 2D drawing, 3D feature tree, transactions with undo/redo, native file format"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+wcad-math = { workspace = true }
+wcad-geom2d = { workspace = true }
+wcad-sketch = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+indexmap = { workspace = true }
+miniz_oxide = { workspace = true }

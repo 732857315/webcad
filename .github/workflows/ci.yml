@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  fmt:
+    name: rustfmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - run: cargo fmt --all -- --check
+
+  native:
+    name: clippy + test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - name: Linux system packages
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          # Build: pkg-config + wayland/xkbcommon headers (winit, rfd portal backend).
+          # Tests: Mesa lavapipe gives wgpu a software Vulkan adapter for renderer tests.
+          sudo apt-get install -y --no-install-recommends pkg-config libwayland-dev libxkbcommon-dev mesa-vulkan-drivers
+      - uses: Swatinem/rust-cache@v2
+      - name: clippy (native, all targets)
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: test
+        run: cargo test --workspace --locked
+
+  wasm:
+    name: wasm32 clippy + web build smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: web
+      - name: clippy (wasm32, app + libraries it uses)
+        run: cargo clippy -p wcad-app --target wasm32-unknown-unknown --locked -- -D warnings
+      # Dev wasm build + wasm-bindgen: catches bindgen schema/version mismatches and wasm-only breakage.
+      - name: cargo xtask web
+        run: cargo xtask web
+      - name: Check dist/
+        run: |
+          set -euo pipefail
+          ls -la dist
+          test -s dist/index.html
+          test -s dist/webcad.js
+          test -s dist/webcad_bg.wasm
+          if grep -n '{{' dist/index.html; then echo "unsubstituted template placeholder"; exit 1; fi

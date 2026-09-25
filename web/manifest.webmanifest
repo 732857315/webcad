@@ -1,0 +1,19 @@
+{
+  "name": "webcad — 二维绘图与三维建模",
+  "short_name": "webcad",
+  "description": "2D drafting, parametric sketches and 3D solid modeling in the browser / 浏览器中的二维绘图、参数化草图与三维实体建模",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "lang": "zh-CN",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#1b1b1b",
+  "theme_color": "#1b1b1b",
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

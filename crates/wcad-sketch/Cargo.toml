@@ -1,0 +1,17 @@
+[package]
+name = "wcad-sketch"
+description = "Parametric 2D sketches for webcad: persisted sketch model + in-house geometric constraint solver"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+wcad-math = { workspace = true }
+wcad-geom2d = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }

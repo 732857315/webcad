@@ -1,0 +1,23 @@
+[package]
+name = "wcad-io"
+description = "webcad import/export: DXF and DWG (acadrust adapter), SVG, PDF"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+wcad-math = { workspace = true }
+wcad-geom2d = { workspace = true }
+wcad-doc = { workspace = true }
+thiserror = { workspace = true }
+log = { workspace = true }
+acadrust = { workspace = true }
+pdf-writer = { workspace = true }
+miniz_oxide = { workspace = true }
+
+# acadrust → ahash → getrandom 0.3 needs its JS backend on the web (the matching
+# `getrandom_backend="wasm_js"` cfg is set in .cargo/config.toml).
+[target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies]
+getrandom = { version = "0.3.4", features = ["wasm_js"] }

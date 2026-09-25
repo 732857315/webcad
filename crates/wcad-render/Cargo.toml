@@ -1,0 +1,21 @@
+[package]
+name = "wcad-render"
+description = "webcad wgpu renderer: 2D line/fill/text batches and 3D shaded meshes into offscreen viewports"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+wcad-math = { workspace = true }
+wgpu = { workspace = true }
+bytemuck = { workspace = true }
+glam = { workspace = true }
+log = { workspace = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+pollster = { workspace = true }
+miniz_oxide = { workspace = true }
+# Same version as wgpu's own naga: validates the WGSL and checks the GLSL ES 3.0 (WebGL2) translation.
+naga = { version = "30.0.1", features = ["wgsl-in", "glsl-out"] }

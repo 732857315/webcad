@@ -1,0 +1,7 @@
+[alias]
+xtask = "run --package xtask --"
+
+[target.wasm32-unknown-unknown]
+# getrandom 0.3 needs the JS backend selected explicitly on wasm32-unknown-unknown (pulled in by
+# acadrust/ahash and the kernel crates). The matching `wasm_js` feature is enabled in wcad-app.
+rustflags = ['--cfg', 'getrandom_backend="wasm_js"']

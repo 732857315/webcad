@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<!-- Template: `cargo xtask web|dist` substitutes the double-brace placeholders. Every URL is RELATIVE so the
+     site works under https://<user>.github.io/<repo>/ as well as on localhost. -->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#1b1b1b">
+<meta name="color-scheme" content="dark">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="webcad">
+<meta name="description" content="webcad — 浏览器中的二维绘图与三维实体建模 / 2D drafting and 3D solid modeling in the browser">
+<title>webcad</title>
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" type="image/png" href="./icons/icon-192.png">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
+<link rel="modulepreload" href="./{{JS}}">
+<style>
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
+               background: #1b1b1b; overscroll-behavior: none; }
+  /* eframe sizes the canvas backing store from its CSS size × devicePixelRatio. touch-action: none
+     hands every touch gesture (pan, pinch) to the app instead of scrolling/zooming the page.
+     The safe-area insets keep the UI clear of notches/home indicators (viewport-fit=cover). */
+  #webcad_canvas { display: block; position: absolute; outline: none; touch-action: none;
+    top: env(safe-area-inset-top, 0px); left: env(safe-area-inset-left, 0px);
+    width: calc(100% - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));
+    height: calc(100% - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); }
+  #loading { position: absolute; inset: 0; display: flex; flex-direction: column; gap: 12px;
+             align-items: center; justify-content: center; color: #bbb;
+             font: 16px system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+             pointer-events: none; }
+  #loading .spinner { width: 28px; height: 28px; border: 3px solid #444; border-top-color: #4a9eeb;
+                      border-radius: 50%; animation: spin 0.9s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #error { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); box-sizing: border-box;
+           width: min(720px, calc(100% - 32px)); max-height: calc(100% - 32px); overflow: auto;
+           padding: 16px 20px; border-radius: 8px; background: #3a1414; border: 1px solid #a33;
+           color: #eee; font: 14px system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; }
+  #error[hidden] { display: none; }
+  #error h1 { margin: 0 0 8px; font-size: 18px; }
+  #error pre { margin: 8px 0; white-space: pre-wrap; word-break: break-word; font: 12px ui-monospace, Consolas, monospace;
+               color: #fbb; user-select: text; }
+  #error button { font: inherit; padding: 6px 14px; border-radius: 4px; border: 1px solid #888;
+                  background: #2a2a2a; color: #eee; cursor: pointer; }
+</style>
+</head>
+<body>
+<canvas id="webcad_canvas"></canvas>
+<div id="loading"><div class="spinner"></div><div>正在加载 webcad… / Loading webcad…</div></div>
+<div id="error" hidden role="alert">
+  <h1>webcad 出错了 / webcad stopped</h1>
+  <div>请刷新页面重试。/ Please reload the page.</div>
+  <pre id="error_text"></pre>
+  <button type="button" onclick="location.reload()">刷新 / Reload</button>
+</div>
+<noscript>webcad 需要 JavaScript 和 WebAssembly。/ webcad needs JavaScript and WebAssembly.</noscript>
+<!-- Loader only: application logic runs in wasm (the Rust `main` starts eframe on #webcad_canvas,
+     removes #loading, and a panic hook fills #error). -->
+<script type="module">
+  function fail(msg) {
+    document.getElementById("loading")?.remove();
+    const box = document.getElementById("error");
+    const text = document.getElementById("error_text");
+    // Keep a message the wasm panic hook already wrote; append the JS-side error below it.
+    text.textContent = text.textContent ? text.textContent + "\n\n" + msg : msg;
+    box.hidden = false;
+  }
+  try {
+    if (typeof WebAssembly !== "object") {
+      throw new Error("此浏览器不支持 WebAssembly / WebAssembly is not supported by this browser");
+    }
+    const { default: init } = await import("./{{JS}}");
+    await init({ module_or_path: new URL("./{{WASM}}", import.meta.url) });
+  } catch (e) {
+    console.error(e);
+    fail(String((e && e.stack) || e));
+  }
+</script>
+<script>
+  if ("serviceWorker" in navigator && location.protocol !== "file:") {
+    if ({{SERVICE_WORKER}}) {
+      navigator.serviceWorker.register("./sw.js", { scope: "./" }).catch((e) => console.warn("service worker:", e));
+    } else {
+      // Dev build (`cargo xtask web`): drop a worker left behind by an earlier `dist` on this origin.
+      navigator.serviceWorker.getRegistrations().then((rs) => rs.forEach((r) => r.unregister()));
+    }
+  }
+</script>
+</body>
+</html>

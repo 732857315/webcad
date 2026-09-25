@@ -1,0 +1,97 @@
+[workspace]
+resolver = "3"
+members = ["crates/*", "xtask"]
+default-members = ["crates/wcad-app"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/732857315/webcad"
+
+[workspace.dependencies]
+# Internal crates
+wcad-math = { path = "crates/wcad-math" }
+wcad-geom2d = { path = "crates/wcad-geom2d" }
+wcad-sketch = { path = "crates/wcad-sketch" }
+wcad-doc = { path = "crates/wcad-doc" }
+wcad-solid = { path = "crates/wcad-solid" }
+wcad-io = { path = "crates/wcad-io" }
+wcad-render = { path = "crates/wcad-render" }
+
+# Foundations
+glam = { version = "0.33.10", features = ["serde", "bytemuck"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+thiserror = "2.0.21"
+indexmap = { version = "2.14.2", features = ["serde"] }
+miniz_oxide = "0.9.1"
+bytemuck = { version = "1.25.2", features = ["derive"] }
+log = "0.4.34"
+web-time = "1.1.0"
+
+# 2D geometry, text, export
+cavalier_contours = "0.9.0"
+lyon_tessellation = "1.0.22"
+lyon_path = "1.0.19"
+rstar = "0.13.0"
+ttf-parser = "0.25.1"
+pdf-writer = "0.15.0"
+
+# File formats (MPL-2.0; only used inside wcad-io). Pin exactly: young crate, fast-moving API.
+acadrust = "=0.5.5"
+
+# 3D kernel. Pin exactly: the fork's API still moves between minor versions.
+monstertruck-modeling = "=0.4.1"
+monstertruck-solid = "=0.4.1"
+monstertruck-fillet = "=0.4.1"
+monstertruck-meshing = { version = "=0.4.1", default-features = false }
+monstertruck-topology = "=0.4.1"
+boolmesh = "=0.1.10"
+
+# UI / GPU
+eframe = { version = "0.36.2", default-features = false, features = ["default_fonts", "wgpu", "wayland", "x11"] }
+egui = "0.36.2"
+egui-wgpu = "0.36.2"
+wgpu = "30.0.1"
+rfd = { version = "0.17.2", default-features = false, features = ["xdg-portal", "wayland"] }
+
+# wasm-bindgen (app, wasm only) and wasm-bindgen-cli-support (xtask) MUST be the exact same version:
+# the bindgen schema check rejects mismatches. Bump both together.
+wasm-bindgen = "=0.2.129"
+wasm-bindgen-cli-support = "=0.2.129"
+wasm-bindgen-futures = "0.4.79"
+js-sys = "0.3.106"
+web-sys = "0.3.106"
+console_error_panic_hook = "0.1.7"
+
+# Native-only helpers
+env_logger = { version = "0.11.11", default-features = false, features = ["auto-color", "humantime"] }
+pollster = "1.0.1"
+
+# xtask
+anyhow = "1.0.104"
+tiny_http = "0.12.0"
+sha2 = "0.11.0"
+
+[profile.dev]
+opt-level = 1                 # wgpu/naga and the kernels are painfully slow at opt-level 0
+debug = "line-tables-only"    # disk is tight on the dev machine
+
+[profile.dev.package."*"]
+opt-level = 2
+debug = false
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = "debuginfo"
+# Native release keeps unwinding so kernel panics can be caught with catch_unwind.
+
+# Web build (`cargo xtask dist`): measured smallest for the egui/wgpu stack ("s" < "z" < 3).
+[profile.web-release]
+inherits = "release"
+opt-level = "s"
+panic = "abort"

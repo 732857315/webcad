@@ -1,0 +1,117 @@
+# Build native desktop binaries for version tags (v1.2.3) and attach them to a GitHub Release.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to (re)build and publish, e.g. v0.1.0"
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  BIN: webcad
+  TAG: ${{ github.event.inputs.tag || github.ref_name }}
+
+jobs:
+  build:
+    name: build ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, target: x86_64-pc-windows-msvc, archive: zip }
+          # 22.04 (glibc 2.35) rather than ubuntu-latest so the binary also runs on older distros.
+          - { os: ubuntu-22.04, target: x86_64-unknown-linux-gnu, archive: tar.gz }
+          - { os: macos-latest, target: aarch64-apple-darwin, archive: tar.gz }
+          # Cross-compiled on the arm64 runner (the Apple SDK ships both architectures).
+          - { os: macos-latest, target: x86_64-apple-darwin, archive: tar.gz }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.TAG }}
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Linux system packages
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          # Build-time headers for winit (wayland) and xkbcommon. X11, Vulkan and GL are loaded at
+          # run time; rfd uses the xdg-desktop-portal backend (no GTK).
+          sudo apt-get install -y --no-install-recommends pkg-config libwayland-dev libxkbcommon-dev
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      # `xtask native --release` adds --remap-path-prefix so no runner paths end up in the binary.
+      - name: Build
+        run: cargo xtask native --release --target ${{ matrix.target }}
+        env:
+          MACOSX_DEPLOYMENT_TARGET: "11.0"
+
+      - name: Package (zip, Windows)
+        if: matrix.archive == 'zip'
+        shell: pwsh
+        run: |
+          $name = "${env:BIN}-${env:TAG}-${{ matrix.target }}"
+          New-Item -ItemType Directory -Force -Path "pkg/$name/licenses" | Out-Null
+          Copy-Item "target/${{ matrix.target }}/release/${env:BIN}.exe" "pkg/$name/"
+          Copy-Item README.md "pkg/$name/"
+          Copy-Item assets/fonts/OFL.txt "pkg/$name/licenses/NotoSansSC-OFL.txt"
+          Copy-Item LICENSE* "pkg/$name/" -ErrorAction SilentlyContinue
+          Compress-Archive -Path "pkg/$name" -DestinationPath "pkg/$name.zip"
+          (Get-FileHash "pkg/$name.zip" -Algorithm SHA256).Hash.ToLower() + "  $name.zip" | Out-File -Encoding ascii "pkg/$name.zip.sha256"
+
+      - name: Package (tar.gz, Linux/macOS)
+        if: matrix.archive == 'tar.gz'
+        shell: bash
+        run: |
+          set -euo pipefail
+          name="${BIN}-${TAG}-${{ matrix.target }}"
+          mkdir -p "pkg/$name/licenses"
+          cp "target/${{ matrix.target }}/release/${BIN}" "pkg/$name/"
+          cp README.md "pkg/$name/"
+          cp assets/fonts/OFL.txt "pkg/$name/licenses/NotoSansSC-OFL.txt"
+          cp LICENSE* "pkg/$name/" 2>/dev/null || true
+          tar -C pkg -czf "pkg/$name.tar.gz" "$name"
+          (cd pkg && shasum -a 256 "$name.tar.gz" > "$name.tar.gz.sha256")
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-${{ matrix.target }}
+          path: |
+            pkg/*.zip
+            pkg/*.tar.gz
+            pkg/*.sha256
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # create the release and upload assets
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: release-*
+          path: assets
+          merge-multiple: true
+      - run: ls -la assets
+      - uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ env.TAG }}
+          files: assets/*
+          fail_on_unmatched_files: true
+          generate_release_notes: true
+          prerelease: ${{ contains(env.TAG, '-') }}   # v1.0.0-rc.1 -> prerelease

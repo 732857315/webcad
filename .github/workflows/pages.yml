@@ -1,0 +1,86 @@
+# Build the wasm app and deploy dist/ to GitHub Pages.
+# One-time repository setting: Settings → Pages → Build and deployment → Source: "GitHub Actions".
+name: Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Least privilege by default; the deploy job elevates below.
+permissions:
+  contents: read
+
+# One deployment at a time. Never cancel a running deploy (it could leave Pages half-published).
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  BINARYEN_VERSION: "133"
+  # sha256 of binaryen-version_133-x86_64-linux.tar.gz (from the release's .sha256 asset).
+  BINARYEN_SHA256: 2dc9c7813f5375db93d96ead4b78222fcc3e2677bbb832297af4797782a37489
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Rust (stable) + wasm32 target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo registry and target/
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: web
+          cache-on-failure: true
+
+      - name: Install wasm-opt (binaryen version_${{ env.BINARYEN_VERSION }}, checksum-verified)
+        run: |
+          set -euo pipefail
+          name="binaryen-version_${BINARYEN_VERSION}-x86_64-linux.tar.gz"
+          url="https://github.com/WebAssembly/binaryen/releases/download/version_${BINARYEN_VERSION}/${name}"
+          curl -fsSL --retry 3 "$url" -o "$RUNNER_TEMP/$name"
+          echo "${BINARYEN_SHA256}  $RUNNER_TEMP/$name" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/binaryen"
+          tar -xzf "$RUNNER_TEMP/$name" -C "$RUNNER_TEMP/binaryen"
+          wasm_opt="$(find "$RUNNER_TEMP/binaryen" -type f -path '*/bin/wasm-opt' | head -n 1)"
+          test -x "$wasm_opt"
+          "$wasm_opt" --version
+          echo "WASM_OPT=$wasm_opt" >> "$GITHUB_ENV"
+
+      # Release wasm (profile web-release) + wasm-bindgen + wasm-opt + hashed names + PWA files -> dist/
+      - name: Build dist/
+        run: cargo xtask dist
+
+      - name: Show dist/
+        run: |
+          ls -la dist
+          du -sh dist
+          for f in dist/*.wasm; do echo "$f: $(stat -c %s "$f") B raw, $(gzip -9 -c "$f" | wc -c) B gzip"; done
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v6
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist/
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write      # create the Pages deployment
+      id-token: write   # OIDC token proving the deployment comes from this workflow
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

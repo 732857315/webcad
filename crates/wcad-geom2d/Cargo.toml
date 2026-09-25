@@ -1,0 +1,20 @@
+[package]
+name = "wcad-geom2d"
+description = "Analytic 2D curves for webcad: intersections, offset, trim/extend/fillet, regions, hatch, text outlines"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+wcad-math = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+cavalier_contours = { workspace = true }
+ttf-parser = { workspace = true }
+lyon_tessellation = { workspace = true }
+lyon_path = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }

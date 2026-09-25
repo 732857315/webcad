@@ -1,0 +1,21 @@
+# Normalize text to LF in the repository.
+* text=auto
+
+# Shell scripts must stay LF even with core.autocrlf=true, or bash fails on '\r'.
+*.sh text eol=lf
+# PowerShell / cmd scripts use CRLF on Windows.
+*.ps1 text eol=crlf
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# Test data and assets: keep bytes exactly as committed.
+*.dxf binary
+*.dwg binary
+*.step binary
+*.stp binary
+*.stl binary
+*.ttf binary
+*.otf binary
+*.png binary
+*.ico binary
+*.wasm binary

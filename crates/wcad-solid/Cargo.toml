@@ -1,0 +1,24 @@
+[package]
+name = "wcad-solid"
+description = "webcad 3D kernel facade: exact B-rep (monstertruck) with mesh-boolean fallback (boolmesh), feature regeneration"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+wcad-math = { workspace = true }
+wcad-geom2d = { workspace = true }
+wcad-sketch = { workspace = true }
+wcad-doc = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+log = { workspace = true }
+monstertruck-modeling = { workspace = true, features = ["fillet"] }
+monstertruck-solid = { workspace = true }
+monstertruck-fillet = { workspace = true }
+monstertruck-meshing = { workspace = true, features = ["analyzers", "filters", "tessellation"] }
+monstertruck-topology = { workspace = true }
+boolmesh = { workspace = true }
+monstertruck-io = "=0.4.1"

@@ -1,0 +1,12 @@
+[package]
+name = "wcad-math"
+description = "f64 math foundation for webcad: glam re-exports, tolerances, angles, bounding boxes, planes"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+glam = { workspace = true }
+serde = { workspace = true }

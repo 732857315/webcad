@@ -1,0 +1,35 @@
+# Build output (root and any standalone crate build)
+**/target/
+/dist/
+**/*.rs.bk
+*.pdb
+*.profraw
+
+# Local experiments, research artifacts, preview copies
+/.scratch/
+
+# Portable app data written next to the native executable
+/webcad-data/
+
+# Logs and caches
+*.log
+__pycache__/
+*.pyc
+
+# Editors and OS
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Local AI assistant instructions and settings
+/CLAUDE.md
+.claude/settings.local.json
+
+# Font charset intermediates; keep the input used by make_subsets.sh
+/assets/fonts/charsets/*.txt
+!/assets/fonts/charsets/set_ui.txt
+/assets/fonts/charsets/npm/
