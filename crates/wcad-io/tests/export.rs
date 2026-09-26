@@ -21,11 +21,20 @@ fn check_xml(s: &str) {
                 if tag.starts_with('?') {
                     assert!(tag.ends_with('?'), "bad processing instruction");
                 } else if let Some(name) = tag.strip_prefix('/') {
-                    let open = stack.pop().unwrap_or_else(|| panic!("unexpected </{name}>"));
+                    let open = stack
+                        .pop()
+                        .unwrap_or_else(|| panic!("unexpected </{name}>"));
                     assert_eq!(open, name.trim(), "mismatched close tag");
                 } else {
-                    let name: String = tag.chars().take_while(|c| !c.is_whitespace() && *c != '/').collect();
-                    assert_eq!(tag.matches('"').count() % 2, 0, "unbalanced quotes in <{tag}>");
+                    let name: String = tag
+                        .chars()
+                        .take_while(|c| !c.is_whitespace() && *c != '/')
+                        .collect();
+                    assert_eq!(
+                        tag.matches('"').count() % 2,
+                        0,
+                        "unbalanced quotes in <{tag}>"
+                    );
                     if !tag.ends_with('/') {
                         stack.push(name);
                     }
@@ -33,9 +42,15 @@ fn check_xml(s: &str) {
                 i = end + 1;
             }
             b'&' => {
-                let end = s[i..].find(';').map(|e| i + e).expect("unterminated entity");
+                let end = s[i..]
+                    .find(';')
+                    .map(|e| i + e)
+                    .expect("unterminated entity");
                 let ent = &s[i + 1..end];
-                assert!(matches!(ent, "amp" | "lt" | "gt" | "quot" | "apos"), "unknown entity &{ent};");
+                assert!(
+                    matches!(ent, "amp" | "lt" | "gt" | "quot" | "apos"),
+                    "unknown entity &{ent};"
+                );
                 i = end + 1;
             }
             _ => i += 1,
@@ -59,7 +74,11 @@ fn svg_is_well_formed_and_complete() {
     assert!(out.trim_end().ends_with("</svg>"));
     check_xml(&out);
     assert!(out.contains("viewBox=\""));
-    let path_has = |c: char| out.split("d=\"").skip(1).any(|d| d.split('"').next().is_some_and(|p| p.contains(c)));
+    let path_has = |c: char| {
+        out.split("d=\"")
+            .skip(1)
+            .any(|d| d.split('"').next().is_some_and(|p| p.contains(c)))
+    };
     assert!(path_has('A'), "native arcs");
     assert!(!path_has('C'), "the only cubic spline is on a frozen layer");
     assert!(out.contains("fill-rule=\"evenodd\""), "solid hatch");
@@ -68,7 +87,10 @@ fn svg_is_well_formed_and_complete() {
     assert!(out.contains("Ø10"), "%%c code");
     assert!(out.contains("Noto Sans SC"));
     assert!(out.contains("L=20.0 mm"), "dimension override text");
-    assert!(out.contains("45.0°<"), "angular dimension without linear suffix");
+    assert!(
+        out.contains("45.0°<"),
+        "angular dimension without linear suffix"
+    );
     assert!(out.contains("#123456"), "true color");
     // Frozen and off layers are hidden: the frozen spline must not be drawn.
     let paths = out.matches("<path").count();
@@ -84,16 +106,27 @@ fn svg_is_well_formed_and_complete() {
     });
     let all = svg::export(&thawed.drawing, &SvgOptions::default());
     check_xml(&all);
-    assert!(all.split("d=\"").skip(1).any(|d| d.split('"').next().is_some_and(|p| p.matches('C').count() == 3)));
+    assert!(all.split("d=\"").skip(1).any(|d| {
+        d.split('"')
+            .next()
+            .is_some_and(|p| p.matches('C').count() == 3)
+    }));
     assert!(all.matches("<path").count() > paths);
 
     let dark = svg::export(
         &s.doc.drawing,
-        &SvgOptions { background: Some([33, 40, 48]), monochrome: true, ..Default::default() },
+        &SvgOptions {
+            background: Some([33, 40, 48]),
+            monochrome: true,
+            ..Default::default()
+        },
     );
     check_xml(&dark);
     assert!(dark.contains("fill=\"#212830\""), "background rect");
-    assert!(dark.contains("stroke=\"#ffffff\""), "monochrome white on dark");
+    assert!(
+        dark.contains("stroke=\"#ffffff\""),
+        "monochrome white on dark"
+    );
     assert!(!dark.contains("#123456"));
 }
 
@@ -102,7 +135,11 @@ fn svg_of_empty_and_imported_drawings() {
     let empty = wcad_doc::Document::new();
     let out = svg::export(&empty.drawing, &SvgOptions::default());
     check_xml(&out);
-    let bytes = std::fs::read(format!("{}/tests/data/sample_R2018.dxf", env!("CARGO_MANIFEST_DIR"))).expect("sample");
+    let bytes = std::fs::read(format!(
+        "{}/tests/data/sample_R2018.dxf",
+        env!("CARGO_MANIFEST_DIR")
+    ))
+    .expect("sample");
     let doc = dxf::import(&bytes).expect("import").document;
     let out = svg::export(&doc.drawing, &SvgOptions::default());
     dump("sample_R2018.svg", out.as_bytes());
@@ -114,7 +151,10 @@ fn media_box(pdf: &[u8]) -> [f64; 4] {
     let s = String::from_utf8_lossy(pdf);
     let at = s.find("/MediaBox [").expect("MediaBox") + "/MediaBox [".len();
     let end = s[at..].find(']').expect("]") + at;
-    let v: Vec<f64> = s[at..end].split_whitespace().map(|x| x.parse().expect("number")).collect();
+    let v: Vec<f64> = s[at..end]
+        .split_whitespace()
+        .map(|x| x.parse().expect("number"))
+        .collect();
     [v[0], v[1], v[2], v[3]]
 }
 
@@ -127,14 +167,32 @@ fn pdf_page_sizes() {
         (Paper::A3, true, 1190.55, 841.89),
         (Paper::A0, false, 2383.94, 3370.39),
         (Paper::Letter, false, 612.0, 792.0),
-        (Paper::Custom { width_mm: 100.0, height_mm: 50.0 }, true, 283.46, 141.73),
+        (
+            Paper::Custom {
+                width_mm: 100.0,
+                height_mm: 50.0,
+            },
+            true,
+            283.46,
+            141.73,
+        ),
     ] {
-        let setup = PageSetup { paper, landscape, ..Default::default() };
+        let setup = PageSetup {
+            paper,
+            landscape,
+            ..Default::default()
+        };
         let bytes = pdf::export(&s.doc.drawing, &setup).expect("pdf");
         assert!(bytes.starts_with(b"%PDF-"), "header");
-        assert!(bytes.ends_with(b"%%EOF\n") || bytes.ends_with(b"%%EOF"), "trailer");
+        assert!(
+            bytes.ends_with(b"%%EOF\n") || bytes.ends_with(b"%%EOF"),
+            "trailer"
+        );
         let mb = media_box(&bytes);
-        assert!((mb[2] - w).abs() < 0.05 && (mb[3] - h).abs() < 0.05, "{paper:?} {landscape}: {mb:?}");
+        assert!(
+            (mb[2] - w).abs() < 0.05 && (mb[3] - h).abs() < 0.05,
+            "{paper:?} {landscape}: {mb:?}"
+        );
     }
 }
 
@@ -147,35 +205,78 @@ fn pdf_options_and_errors() {
     dump("sample.pdf", &a);
     let b = pdf::export(
         d,
-        &PageSetup { scale: PlotScale::one_to(2.0), monochrome: true, line_weights: false, ..base.clone() },
+        &PageSetup {
+            scale: PlotScale::one_to(2.0),
+            monochrome: true,
+            line_weights: false,
+            ..base.clone()
+        },
     )
     .expect("1:2");
     assert!(b.starts_with(b"%PDF-"));
     // Invalid setups are errors, not panics.
-    assert!(pdf::export(d, &PageSetup { margin_mm: 200.0, ..base.clone() }).is_err());
     assert!(
-        pdf::export(d, &PageSetup { scale: PlotScale::Ratio { paper_mm: 0.0, drawing_units: 1.0 }, ..base.clone() })
-            .is_err()
+        pdf::export(
+            d,
+            &PageSetup {
+                margin_mm: 200.0,
+                ..base.clone()
+            }
+        )
+        .is_err()
     );
     assert!(
-        pdf::export(d, &PageSetup { paper: Paper::Custom { width_mm: f64::NAN, height_mm: 10.0 }, ..base.clone() })
-            .is_err()
+        pdf::export(
+            d,
+            &PageSetup {
+                scale: PlotScale::Ratio {
+                    paper_mm: 0.0,
+                    drawing_units: 1.0
+                },
+                ..base.clone()
+            }
+        )
+        .is_err()
+    );
+    assert!(
+        pdf::export(
+            d,
+            &PageSetup {
+                paper: Paper::Custom {
+                    width_mm: f64::NAN,
+                    height_mm: 10.0
+                },
+                ..base.clone()
+            }
+        )
+        .is_err()
     );
     // Empty drawing still gives a valid page.
     let empty = wcad_doc::Document::new();
-    assert!(pdf::export(&empty.drawing, &base).expect("empty").starts_with(b"%PDF-"));
+    assert!(
+        pdf::export(&empty.drawing, &base)
+            .expect("empty")
+            .starts_with(b"%PDF-")
+    );
 }
 
 #[test]
 fn pdf_with_embedded_font() {
-    let path = format!("{}/../../assets/fonts/NotoSansSC-Regular-ui.ttf", env!("CARGO_MANIFEST_DIR"));
+    let path = format!(
+        "{}/../../assets/fonts/NotoSansSC-Regular-ui.ttf",
+        env!("CARGO_MANIFEST_DIR")
+    );
     let Ok(bytes) = std::fs::read(&path) else {
         println!("font not found, skipping");
         return;
     };
     let font = Font::from_bytes(Arc::from(bytes), 0).expect("font parses");
     let s = common::sample();
-    let setup = PageSetup { font: Some(font), paper: Paper::A3, ..Default::default() };
+    let setup = PageSetup {
+        font: Some(font),
+        paper: Paper::A3,
+        ..Default::default()
+    };
     let out = pdf::export(&s.doc.drawing, &setup).expect("pdf");
     dump("sample_font.pdf", &out);
     assert!(out.starts_with(b"%PDF-"));
@@ -200,18 +301,30 @@ fn dxf_output_uses_autocad_units() {
     // Block BOLT is written with its entities relative to the origin (base folded in).
     assert!(text.contains("BOLT"));
     // Dimensions reference generated anonymous geometry blocks.
-    assert!(lines.windows(2).any(|w| w[0] == "2" && w[1] == "*D1"), "DIMENSION → *D1 block");
+    assert!(
+        lines.windows(2).any(|w| w[0] == "2" && w[1] == "*D1"),
+        "DIMENSION → *D1 block"
+    );
 }
 
 #[test]
 fn pre_2007_text_uses_unicode_escapes() {
     let s = common::sample();
     let old = dxf::export(&s.doc, DxfVersion::R2000).expect("R2000");
-    assert!(old.is_ascii(), "R2000 DXF is pure ASCII (non-ASCII text escaped)");
+    assert!(
+        old.is_ascii(),
+        "R2000 DXF is pure ASCII (non-ASCII text escaped)"
+    );
     let text = String::from_utf8_lossy(&old);
     assert!(text.contains(r"\U+4E2D\U+6587"), "CJK escaped");
     let new = dxf::export(&s.doc, DxfVersion::R2018).expect("R2018");
-    assert!(String::from_utf8_lossy(&new).contains("中文"), "R2018 keeps UTF-8");
+    assert!(
+        String::from_utf8_lossy(&new).contains("中文"),
+        "R2018 keeps UTF-8"
+    );
     let back = dxf::import(&old).expect("import");
-    assert!(back.document.drawing.layer_by_name("不打印").is_some(), "CJK layer name decoded");
+    assert!(
+        back.document.drawing.layer_by_name("不打印").is_some(),
+        "CJK layer name decoded"
+    );
 }

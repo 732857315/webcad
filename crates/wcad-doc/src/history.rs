@@ -25,7 +25,10 @@ pub(crate) struct Transaction {
 
 impl Transaction {
     pub fn is_empty(&self) -> bool {
-        self.entities.is_empty() && self.tables.is_none() && self.blocks.is_none() && self.part.is_none()
+        self.entities.is_empty()
+            && self.tables.is_none()
+            && self.blocks.is_none()
+            && self.part.is_none()
     }
 }
 
@@ -38,7 +41,11 @@ pub(crate) struct History {
 
 impl Default for History {
     fn default() -> Self {
-        Self { undo: Vec::new(), redo: Vec::new(), limit: 200 }
+        Self {
+            undo: Vec::new(),
+            redo: Vec::new(),
+            limit: 200,
+        }
     }
 }
 

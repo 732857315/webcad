@@ -137,15 +137,40 @@ fn top_left() -> u8 {
 #[serde(tag = "type")]
 pub enum DimKind {
     /// Horizontal/vertical/rotated linear dimension measured along `rotation`.
-    Linear { p1: DVec2, p2: DVec2, line_point: DVec2, rotation: f64 },
+    Linear {
+        p1: DVec2,
+        p2: DVec2,
+        line_point: DVec2,
+        rotation: f64,
+    },
     /// Aligned with p1→p2; `line_point` fixes the offset of the dimension line.
-    Aligned { p1: DVec2, p2: DVec2, line_point: DVec2 },
-    Radius { center: DVec2, point: DVec2 },
-    Diameter { center: DVec2, point: DVec2 },
+    Aligned {
+        p1: DVec2,
+        p2: DVec2,
+        line_point: DVec2,
+    },
+    Radius {
+        center: DVec2,
+        point: DVec2,
+    },
+    Diameter {
+        center: DVec2,
+        point: DVec2,
+    },
     /// Angle at `vertex` from ray→p1 to ray→p2 (CCW); `arc_point` places the arc.
-    Angular { vertex: DVec2, p1: DVec2, p2: DVec2, arc_point: DVec2 },
+    Angular {
+        vertex: DVec2,
+        p1: DVec2,
+        p2: DVec2,
+        arc_point: DVec2,
+    },
     /// Ordinate dimension from the origin; `x_axis` chooses the measured coordinate.
-    Ordinate { origin: DVec2, point: DVec2, leader_end: DVec2, x_axis: bool },
+    Ordinate {
+        origin: DVec2,
+        point: DVec2,
+        leader_end: DVec2,
+        x_axis: bool,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

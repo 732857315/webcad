@@ -108,11 +108,11 @@ impl WebCadApp {
                     }
                 }
                 "ws" => {
-                    self.workspace = if v.eq_ignore_ascii_case("3d") {
+                    self.set_workspace(if v.eq_ignore_ascii_case("3d") {
                         Workspace::Modeling
                     } else {
                         Workspace::Drafting
-                    };
+                    });
                 }
                 "cmd" => {
                     self.ed.lang = self.settings.lang;
@@ -280,6 +280,9 @@ impl WebCadApp {
         for h in hooks {
             h(&ctx, &mut self.ed);
         }
+        ctx.data_mut(|data| {
+            data.remove::<bool>(egui::Id::new(crate::modeling::CANCEL_DIALOGS));
+        });
         // Requests raised by the viewport or hooks (e.g. clicks that finished ZOOM).
         self.handle_requests(&ctx);
         self.dialogs(&ctx);
@@ -299,6 +302,9 @@ impl WebCadApp {
         if consume(sc(Modifiers::NONE, Key::Escape)) {
             self.ed.escape();
             self.cmd_input.clear();
+            ctx.data_mut(|data| {
+                data.insert_temp(egui::Id::new(crate::modeling::CANCEL_DIALOGS), true);
+            });
         }
         if consume(sc(Modifiers::COMMAND, Key::S)) {
             self.ed.requests.push(AppRequest::Save);
@@ -506,7 +512,7 @@ impl WebCadApp {
             match r {
                 AppRequest::ZoomExtents => match self.workspace {
                     Workspace::Drafting => self.view2d.zoom_extents(&self.ed),
-                    Workspace::Modeling => self.view3d.fit(16.0 / 9.0),
+                    Workspace::Modeling => self.view3d.fit_pending = true,
                 },
                 AppRequest::ZoomWindow(b) => self.view2d.zoom_window(&b),
                 AppRequest::New => self.guard(Pending::New, ctx),
@@ -521,7 +527,14 @@ impl WebCadApp {
                     &[("DXF / DWG", &["dxf", "dwg"])],
                 ),
                 AppRequest::Export(f) => self.export(ctx, f),
-                AppRequest::SetWorkspace(w) => self.workspace = w,
+                AppRequest::SetWorkspace(w) => self.set_workspace(w),
+                AppRequest::ShowDialog(id) => {
+                    if self.ed.has_tool() {
+                        self.ed.escape();
+                    }
+                    ctx.data_mut(|data| data.insert_temp(egui::Id::new(id), true));
+                    ctx.request_repaint();
+                }
                 AppRequest::SaveBytes { name, bytes } => {
                     platform::save_file(self.inbox.clone(), ctx.clone(), name, bytes, None)
                 }
@@ -702,8 +715,43 @@ impl WebCadApp {
         }
     }
 
+    fn set_workspace(&mut self, workspace: Workspace) {
+        if self.workspace == workspace {
+            return;
+        }
+        if workspace == Workspace::Modeling && self.ed.has_tool() {
+            self.ed.escape();
+        }
+        self.workspace = workspace;
+        match workspace {
+            Workspace::Drafting => {
+                self.ribbon_tab = RibbonTab::Draw;
+                self.left_tab = "layers";
+            }
+            Workspace::Modeling => {
+                self.ribbon_tab = RibbonTab::Model;
+                self.left_tab = "model_tree";
+            }
+        }
+    }
+
+    fn feature_menus(&mut self, ui: &mut egui::Ui) {
+        let s = self.s();
+        ui.menu_button(s.menu_draw, |ui| self.command_menu(ui, &[RibbonTab::Draw]));
+        ui.menu_button(s.menu_modify, |ui| {
+            self.command_menu(ui, &[RibbonTab::Modify])
+        });
+        ui.menu_button(s.menu_annotate, |ui| {
+            self.command_menu(ui, &[RibbonTab::Annotate])
+        });
+        ui.menu_button(s.menu_3d, |ui| {
+            self.command_menu(ui, &[RibbonTab::Model, RibbonTab::Sketch])
+        });
+    }
+
     fn menu_bar(&mut self, ui: &mut egui::Ui, narrow: bool) {
         let s = self.s();
+        let mut workspace = self.workspace;
         egui::MenuBar::new().ui(ui, |ui| {
             ui.menu_button(s.menu_file, |ui| {
                 if ui.button(s.new).clicked() {
@@ -799,6 +847,10 @@ impl WebCadApp {
                     self.ed.selection.clear();
                     ui.close();
                 }
+                if narrow {
+                    ui.separator();
+                    self.feature_menus(ui);
+                }
             });
             ui.menu_button(s.menu_view, |ui| {
                 if ui.button(s.zoom_extents).clicked() {
@@ -811,16 +863,8 @@ impl WebCadApp {
                 }
                 ui.separator();
                 ui.label(s.workspace);
-                ui.radio_value(
-                    &mut self.workspace,
-                    Workspace::Drafting,
-                    s.workspace_drafting,
-                );
-                ui.radio_value(
-                    &mut self.workspace,
-                    Workspace::Modeling,
-                    s.workspace_modeling,
-                );
+                ui.radio_value(&mut workspace, Workspace::Drafting, s.workspace_drafting);
+                ui.radio_value(&mut workspace, Workspace::Modeling, s.workspace_modeling);
                 ui.separator();
                 ui.checkbox(&mut self.settings.left_panel, s.show_left);
                 ui.checkbox(&mut self.settings.right_panel, s.show_right);
@@ -841,16 +885,9 @@ impl WebCadApp {
                     ui.radio_value(&mut self.settings.lang, l, l.native_name());
                 }
             });
-            ui.menu_button(s.menu_draw, |ui| self.command_menu(ui, &[RibbonTab::Draw]));
-            ui.menu_button(s.menu_modify, |ui| {
-                self.command_menu(ui, &[RibbonTab::Modify])
-            });
-            ui.menu_button(s.menu_annotate, |ui| {
-                self.command_menu(ui, &[RibbonTab::Annotate])
-            });
-            ui.menu_button(s.menu_3d, |ui| {
-                self.command_menu(ui, &[RibbonTab::Model, RibbonTab::Sketch])
-            });
+            if !narrow {
+                self.feature_menus(ui);
+            }
             ui.menu_button(s.menu_help, |ui| {
                 if ui.button(s.shortcuts).clicked() {
                     self.show_shortcuts = true;
@@ -863,51 +900,52 @@ impl WebCadApp {
             });
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 ui.selectable_value(
-                    &mut self.workspace,
+                    &mut workspace,
                     Workspace::Modeling,
                     if narrow { "3D" } else { s.workspace_modeling },
                 );
                 ui.selectable_value(
-                    &mut self.workspace,
+                    &mut workspace,
                     Workspace::Drafting,
                     if narrow { "2D" } else { s.workspace_drafting },
                 );
-                ui.separator();
-                if ui
-                    .selectable_label(self.settings.right_panel, "▣")
-                    .on_hover_text(s.properties)
-                    .clicked()
-                {
-                    self.settings.right_panel = !self.settings.right_panel;
-                }
-                if ui
-                    .selectable_label(self.settings.left_panel, "☰")
-                    .on_hover_text(s.layers)
-                    .clicked()
-                {
-                    self.settings.left_panel = !self.settings.left_panel;
-                }
-                ui.separator();
-                if ui
-                    .add_enabled(self.ed.doc.can_redo(), egui::Button::new("⟳").frame(false))
-                    .on_hover_text(s.redo)
-                    .clicked()
-                {
-                    self.ed.redo();
-                }
-                if ui
-                    .add_enabled(self.ed.doc.can_undo(), egui::Button::new("⟲").frame(false))
-                    .on_hover_text(s.undo)
-                    .clicked()
-                {
-                    self.ed.undo();
-                }
                 if !narrow {
+                    ui.separator();
+                    if ui
+                        .selectable_label(self.settings.right_panel, "▣")
+                        .on_hover_text(s.properties)
+                        .clicked()
+                    {
+                        self.settings.right_panel = !self.settings.right_panel;
+                    }
+                    if ui
+                        .selectable_label(self.settings.left_panel, "☰")
+                        .on_hover_text(s.layers)
+                        .clicked()
+                    {
+                        self.settings.left_panel = !self.settings.left_panel;
+                    }
+                    ui.separator();
+                    if ui
+                        .add_enabled(self.ed.doc.can_redo(), egui::Button::new("⟳").frame(false))
+                        .on_hover_text(s.redo)
+                        .clicked()
+                    {
+                        self.ed.redo();
+                    }
+                    if ui
+                        .add_enabled(self.ed.doc.can_undo(), egui::Button::new("⟲").frame(false))
+                        .on_hover_text(s.undo)
+                        .clicked()
+                    {
+                        self.ed.undo();
+                    }
                     let dirty = if self.ed.doc.is_dirty() { " *" } else { "" };
                     ui.weak(format!("{}{dirty}", self.title_name()));
                 }
             });
         });
+        self.set_workspace(workspace);
     }
 
     // -------------------------------------------------------------------------------------------
@@ -915,11 +953,18 @@ impl WebCadApp {
 
     fn ribbon(&mut self, ui: &mut egui::Ui, narrow: bool) {
         let lang = self.settings.lang;
-        ui.horizontal(|ui| {
-            for tab in RibbonTab::ALL {
-                ui.selectable_value(&mut self.ribbon_tab, tab, tab.label(lang));
-            }
-        });
+        egui::ScrollArea::horizontal()
+            .id_salt("ribbon_tabs_scroll")
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    for tab in RibbonTab::ALL {
+                        if self.registry.on_tab(tab).next().is_none() {
+                            continue;
+                        }
+                        ui.selectable_value(&mut self.ribbon_tab, tab, tab.label(lang));
+                    }
+                });
+            });
         let cmds: Vec<_> = self.registry.on_tab(self.ribbon_tab).copied().collect();
         let labels = self.settings.ribbon_labels && !narrow;
         egui::ScrollArea::horizontal()
@@ -1348,6 +1393,197 @@ mod tests {
             run_app_frames(&mut app, &ctx, 2, size);
         }
         assert_eq!(app.view3d.regen.bodies.len(), 1, "demo box regenerated");
+    }
+
+    #[test]
+    fn mobile_menu_labels_remain_visible_and_do_not_overlap() {
+        for lang in [Lang::Zh, Lang::En] {
+            for width in [320.0, 390.0] {
+                let (mut app, ctx) = app();
+                app.settings.lang = lang;
+                let out = run_app_frames(&mut app, &ctx, 3, egui::vec2(width, 844.0));
+                let labels: Vec<_> = out
+                    .shapes
+                    .iter()
+                    .filter_map(|s| match &s.shape {
+                        egui::Shape::Text(t) if t.pos.y < 24.0 => Some((
+                            t.galley.job.text.as_str(),
+                            egui::Rect::from_min_size(t.pos, t.galley.size()),
+                        )),
+                        _ => None,
+                    })
+                    .collect();
+                let s = app.s();
+                for name in [
+                    s.menu_file,
+                    s.menu_edit,
+                    s.menu_view,
+                    s.menu_help,
+                    "2D",
+                    "3D",
+                ] {
+                    assert!(
+                        labels.iter().any(|(text, _)| *text == name),
+                        "missing {name}"
+                    );
+                }
+                for (i, (name, rect)) in labels.iter().enumerate() {
+                    assert!(rect.min.x >= 0.0 && rect.max.x <= width, "clipped {name}");
+                    for (other, other_rect) in &labels[i + 1..] {
+                        assert!(!rect.intersects(*other_rect), "{name} overlaps {other}");
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn switching_workspace_exposes_its_tools_and_panel_without_resetting_repeat_requests() {
+        let (mut app, _) = app();
+        app.ed.submit("LINE");
+        app.ed.submit("0,0");
+        app.set_workspace(Workspace::Modeling);
+        assert!(!app.ed.has_tool());
+        assert_eq!(app.ribbon_tab, RibbonTab::Model);
+        assert_eq!(app.left_tab, "model_tree");
+        app.ribbon_tab = RibbonTab::View;
+        app.left_tab = "styles";
+        app.set_workspace(Workspace::Modeling);
+        assert_eq!(app.ribbon_tab, RibbonTab::View);
+        assert_eq!(app.left_tab, "styles");
+        app.set_workspace(Workspace::Drafting);
+        assert_eq!(app.ribbon_tab, RibbonTab::Draw);
+        assert_eq!(app.left_tab, "layers");
+    }
+
+    #[test]
+    fn escape_closes_feature_dialogs_through_the_real_application() {
+        for command in ["BOX", "EXTRUDE"] {
+            let (mut app, ctx) = app();
+            app.settings.lang = Lang::En;
+            for input in ["RECTANG", "0,0", "20,10"] {
+                app.ed.submit(input);
+            }
+            app.ed.select_all();
+            app.ed.doc.clear_history();
+            let before = wcad_doc::file::to_json(&app.ed.doc, false).unwrap();
+            app.ed.run_command(command);
+            let size = egui::vec2(1280.0, 900.0);
+            run_app_frames(&mut app, &ctx, 3, size);
+            crate::testing::run_app_frame_with(
+                &mut app,
+                &ctx,
+                size,
+                vec![egui::Event::Key {
+                    key: egui::Key::Escape,
+                    physical_key: None,
+                    pressed: true,
+                    repeat: false,
+                    modifiers: egui::Modifiers::NONE,
+                }],
+            );
+            let out = run_app_frames(&mut app, &ctx, 3, size);
+            assert!(!out.shapes.iter().any(|s| matches!(&s.shape,
+                egui::Shape::Text(t) if t.galley.job.text == "Create" || t.galley.job.text == "OK"
+            )), "{command} did not close");
+            assert_eq!(wcad_doc::file::to_json(&app.ed.doc, false).unwrap(), before);
+            assert!(!app.ed.doc.can_undo());
+        }
+    }
+
+    #[test]
+    fn extrude_dialog_creates_a_real_body_from_a_button_click() {
+        let (mut app, ctx) = app();
+        app.settings.lang = Lang::En;
+        for command in ["RECTANG", "0,0", "20,10"] {
+            app.ed.submit(command);
+        }
+        app.ed.select_all();
+        app.ed.run_command("EXTRUDE");
+        let size = egui::vec2(1280.0, 900.0);
+        let out = run_app_frames(&mut app, &ctx, 3, size);
+        let position = out
+            .shapes
+            .iter()
+            .find_map(|s| match &s.shape {
+                egui::Shape::Text(t) if t.galley.job.text == "Create" => {
+                    Some(t.pos + t.galley.size() * 0.5)
+                }
+                _ => None,
+            })
+            .expect("the extrusion dialog must have a reachable Create button");
+        for pressed in [true, false] {
+            crate::testing::run_app_frame_with(
+                &mut app,
+                &ctx,
+                size,
+                vec![
+                    egui::Event::PointerMoved(position),
+                    egui::Event::PointerButton {
+                        pos: position,
+                        button: egui::PointerButton::Primary,
+                        pressed,
+                        modifiers: egui::Modifiers::NONE,
+                    },
+                ],
+            );
+        }
+        run_app_frames(&mut app, &ctx, 3, size);
+        assert_eq!(app.workspace, Workspace::Modeling);
+        assert_eq!(app.ed.doc.part.features.len(), 2);
+        assert_eq!(app.ed.doc.drawing.entities.len(), 1);
+        assert_eq!(app.view3d.regen.bodies.len(), 1);
+        assert!(
+            app.view3d
+                .regen
+                .feature_status
+                .iter()
+                .all(|(_, s)| !s.is_error())
+        );
+        app.ed.undo();
+        assert!(app.ed.doc.part.features.is_empty());
+        assert_eq!(app.ed.doc.drawing.entities.len(), 1);
+    }
+
+    #[test]
+    fn feature_dialog_requests_cancel_drawing_without_clearing_selection() {
+        let (mut app, ctx) = app();
+        app.ed.doc.transact("point", |tx| {
+            tx.add(wcad_doc::EntityKind::Point {
+                p: wcad_math::DVec2::ZERO,
+            });
+        });
+        app.ed.pump();
+        app.ed.select_all();
+        app.ed.submit("PLINE");
+        app.ed.submit("0,0");
+        app.ed.submit("10,0");
+        assert!(app.ed.has_tool());
+        app.ed
+            .requests
+            .push(AppRequest::ShowDialog("test_feature_dialog"));
+        app.handle_requests(&ctx);
+        assert!(!app.ed.has_tool());
+        assert!(app.ed.preview.is_empty());
+        assert_eq!(app.ed.doc.drawing.entities.len(), 1);
+        assert_eq!(app.ed.selection.len(), 1);
+        assert_eq!(
+            ctx.data(|data| data.get_temp::<bool>(egui::Id::new("test_feature_dialog"))),
+            Some(true)
+        );
+    }
+
+    #[test]
+    fn model_zoom_waits_for_regeneration_and_actual_viewport_size() {
+        let (mut app, ctx) = app();
+        app.view3d.fit_pending = false;
+        app.ed.requests.extend([
+            AppRequest::SetWorkspace(Workspace::Modeling),
+            AppRequest::ZoomExtents,
+        ]);
+        app.handle_requests(&ctx);
+        assert_eq!(app.workspace, Workspace::Modeling);
+        assert!(app.view3d.fit_pending);
     }
 
     #[test]

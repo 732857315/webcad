@@ -20,7 +20,10 @@ pub fn import(bytes: &[u8]) -> Result<ImportReport> {
     }
     let read = |failsafe: bool| {
         guarded("DXF", || {
-            let config = DxfReaderConfiguration { failsafe, default_encoding: None };
+            let config = DxfReaderConfiguration {
+                failsafe,
+                default_encoding: None,
+            };
             DxfReader::from_reader(Cursor::new(bytes.to_vec()))
                 .map_err(|e| Error::Dxf(e.to_string()))?
                 .with_configuration(config)
@@ -39,17 +42,25 @@ pub fn import(bytes: &[u8]) -> Result<ImportReport> {
     if outcome.document.entity_count() == 0 && outcome.stats.decoded_source_records == 0 {
         return Err(Error::Dxf("no DXF records found".into()));
     }
-    let extras = import::Extras { block_bases: block_base_points(bytes) };
+    let extras = import::Extras {
+        block_bases: block_base_points(bytes),
+    };
     let mut report = import::to_document(&outcome.document, Flavor::Dxf, &extras);
     if recovered {
-        report.warnings.insert(0, "the file is damaged; only the readable part was imported".into());
+        report.warnings.insert(
+            0,
+            "the file is damaged; only the readable part was imported".into(),
+        );
     }
     let diags = &outcome.stats.diagnostics;
     for d in diags.iter().take(MAX_DIAGNOSTICS) {
         report.warnings.push(format!("DXF reader: {}", d.message));
     }
     if diags.len() > MAX_DIAGNOSTICS {
-        report.warnings.push(format!("DXF reader: {} more problems", diags.len() - MAX_DIAGNOSTICS));
+        report.warnings.push(format!(
+            "DXF reader: {} more problems",
+            diags.len() - MAX_DIAGNOSTICS
+        ));
     }
     Ok(report)
 }
@@ -58,7 +69,12 @@ pub fn import(bytes: &[u8]) -> Result<ImportReport> {
 pub fn export(doc: &Document, version: DxfVersion) -> Result<Vec<u8>> {
     let cad = export::from_document(doc, version, Flavor::Dxf)?;
     guarded("DXF writer", || {
-        DxfWriter::new(&cad).write_to_vec().map_err(|e| Error::Write { format: "DXF", message: e.to_string() })
+        DxfWriter::new(&cad)
+            .write_to_vec()
+            .map_err(|e| Error::Write {
+                format: "DXF",
+                message: e.to_string(),
+            })
     })
 }
 
@@ -125,6 +141,9 @@ mod tests {
     fn scans_block_bases() {
         let dxf = "0\nSECTION\n2\nBLOCKS\n0\nBLOCK\n8\n0\n2\nBOLT\n70\n0\n10\n5.5\n20\n-2\n30\n0\n0\nENDBLK\n0\nENDSEC\n0\nEOF\n";
         let m = super::block_base_points(dxf.as_bytes());
-        assert_eq!(m.get("BOLT").copied(), Some(wcad_math::DVec2::new(5.5, -2.0)));
+        assert_eq!(
+            m.get("BOLT").copied(),
+            Some(wcad_math::DVec2::new(5.5, -2.0))
+        );
     }
 }

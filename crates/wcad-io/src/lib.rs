@@ -34,7 +34,10 @@ pub enum Error {
     #[error("not a DWG file or unsupported DWG version: {0}")]
     Dwg(String),
     #[error("could not write {format}: {message}")]
-    Write { format: &'static str, message: String },
+    Write {
+        format: &'static str,
+        message: String,
+    },
     #[error("the {0} reader failed on malformed input")]
     ReaderPanic(&'static str),
     #[error("invalid page setup: {0}")]
@@ -114,7 +117,11 @@ pub fn is_dwg(bytes: &[u8]) -> bool {
 
 /// Import DWG or DXF, chosen by content (for dropped files whose extension is unreliable).
 pub fn import_auto(bytes: &[u8]) -> Result<ImportReport> {
-    if is_dwg(bytes) { dwg::import(bytes) } else { dxf::import(bytes) }
+    if is_dwg(bytes) {
+        dwg::import(bytes)
+    } else {
+        dxf::import(bytes)
+    }
 }
 
 /// Run a third-party reader/writer, turning a panic into an error on targets that unwind.

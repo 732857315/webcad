@@ -415,6 +415,19 @@ mod tests {
     }
 
     #[test]
+    fn service_worker_is_isolated_from_other_project_sites() {
+        let web = root().join("web");
+        let worker = fs::read_to_string(web.join("sw.js")).unwrap();
+        assert!(worker.contains("new URL(self.registration.scope)"));
+        assert!(worker.contains("k.startsWith(CACHE_PREFIX)"));
+        assert!(worker.contains("url.pathname.startsWith(scope.pathname)"));
+        assert!(!worker.contains("caches.match("));
+        let index = fs::read_to_string(web.join("index.html")).unwrap();
+        assert!(index.contains("r.scope === appScope"));
+        assert!(!index.contains("rs.forEach((r) => r.unregister())"));
+    }
+
+    #[test]
     fn copy_tree_skips_templates_and_dotfiles() {
         let tmp = std::env::temp_dir().join(format!("xtask-copy-test-{}", std::process::id()));
         let src = tmp.join("src");

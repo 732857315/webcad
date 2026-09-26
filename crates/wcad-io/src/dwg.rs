@@ -34,16 +34,23 @@ pub fn import(bytes: &[u8]) -> Result<ImportReport> {
             _ => return Err(strict_err),
         },
     };
-    let mut report = import::to_document(&outcome.document, Flavor::Dwg, &import::Extras::default());
+    let mut report =
+        import::to_document(&outcome.document, Flavor::Dwg, &import::Extras::default());
     if recovered {
-        report.warnings.insert(0, "the file is damaged; only the readable part was imported".into());
+        report.warnings.insert(
+            0,
+            "the file is damaged; only the readable part was imported".into(),
+        );
     }
     let diags = &outcome.stats.diagnostics;
     for d in diags.iter().take(MAX_DIAGNOSTICS) {
         report.warnings.push(format!("DWG reader: {}", d.message));
     }
     if diags.len() > MAX_DIAGNOSTICS {
-        report.warnings.push(format!("DWG reader: {} more problems", diags.len() - MAX_DIAGNOSTICS));
+        report.warnings.push(format!(
+            "DWG reader: {} more problems",
+            diags.len() - MAX_DIAGNOSTICS
+        ));
     }
     Ok(report)
 }
@@ -52,6 +59,9 @@ pub fn import(bytes: &[u8]) -> Result<ImportReport> {
 pub fn export(doc: &Document, version: DwgVersion) -> Result<Vec<u8>> {
     let cad = export::from_document(doc, version, Flavor::Dwg)?;
     guarded("DWG writer", || {
-        DwgWriter::write_to_vec(&cad).map_err(|e| Error::Write { format: "DWG", message: e.to_string() })
+        DwgWriter::write_to_vec(&cad).map_err(|e| Error::Write {
+            format: "DWG",
+            message: e.to_string(),
+        })
     })
 }

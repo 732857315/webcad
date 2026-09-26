@@ -12,7 +12,7 @@ use wcad_doc::{ChangeSet, Document, EntityId};
 use wcad_math::{BBox2, DVec2};
 
 use crate::cmdline::{self, ParseCx, Parsed};
-use crate::commands::{CommandKind, CommandRegistry};
+use crate::commands::{CommandKind, CommandRegistry, RibbonTab};
 use crate::i18n::{Lang, core, fmt};
 use crate::select::{self, Selection};
 use crate::settings::DraftSettings;
@@ -34,6 +34,8 @@ pub enum AppRequest {
     LoadDemo,
     /// Show a dock panel by id (e.g. `"layers"`).
     ShowPanel(&'static str),
+    /// Signal a registered UI hook to open its parameter dialog.
+    ShowDialog(&'static str),
     /// Save/download bytes under a file name (native: save dialog; web: download).
     SaveBytes {
         name: String,
@@ -109,6 +111,7 @@ pub struct Editor {
     last_command: Option<&'static str>,
     angle_lock: Option<f64>,
     display_changes: ChangeSet,
+    document_generation: u64,
 }
 
 fn merge(into: &mut ChangeSet, c: ChangeSet) {
@@ -143,6 +146,7 @@ impl Editor {
                 all: true,
                 ..Default::default()
             },
+            document_generation: 0,
         };
         e.pump();
         e
@@ -150,6 +154,7 @@ impl Editor {
 
     /// Replace the document (open/new/import). Cancels the active tool and clears the selection.
     pub fn set_document(&mut self, doc: Document) {
+        self.document_generation = self.document_generation.wrapping_add(1);
         self.tool = None;
         self.preview.clear();
         self.selection.clear();
@@ -159,6 +164,11 @@ impl Editor {
         self.doc = doc;
         self.display_changes.all = true;
         self.pump();
+    }
+
+    /// Session-local identity for invalidating dialogs after replacing even an identical document.
+    pub fn document_generation(&self) -> u64 {
+        self.document_generation
     }
 
     /// Absorb document changes: update the spatial index, prune the selection and remember the
@@ -343,6 +353,15 @@ impl Editor {
 
     /// Deliver an input to the active tool.
     pub fn feed(&mut self, input: ToolInput) {
+        let finite = match &input {
+            ToolInput::Point(p) | ToolInput::Hover(p) => p.is_finite(),
+            ToolInput::Value(v) => v.is_finite(),
+            _ => true,
+        };
+        if !finite {
+            self.error(fmt(core(self.lang).invalid_input, &[&format!("{input:?}")]));
+            return;
+        }
         if let ToolInput::Point(p) = input {
             self.last_point = Some(p);
             self.angle_lock = None;
@@ -364,6 +383,13 @@ impl Editor {
             CommandKind::Tool(ctor) => {
                 if self.tool.is_some() {
                     self.escape_tool();
+                }
+                if matches!(
+                    spec.tab,
+                    Some(RibbonTab::Draw | RibbonTab::Modify | RibbonTab::Annotate)
+                ) {
+                    self.requests
+                        .push(AppRequest::SetWorkspace(Workspace::Drafting));
                 }
                 self.start_tool(ctor());
             }
@@ -594,6 +620,9 @@ impl Editor {
 
     /// Primary click at world position `raw`. `shift` removes from the selection.
     pub fn click(&mut self, raw: DVec2, shift: bool) {
+        if !raw.is_finite() {
+            return;
+        }
         self.pointer_move(raw);
         let accepts = self.tool_accepts();
         if self.tool.is_some() && accepts.point {
@@ -677,7 +706,8 @@ impl Editor {
 
     /// Recompute the tool preview for the current cursor.
     pub fn refresh_preview(&mut self) {
-        let mut out = Preview::default();
+        let mut out = std::mem::take(&mut self.preview);
+        out.clear();
         if let Some(tool) = self.tool.take() {
             {
                 let cursor = self.cursor.map(|c| c.point);
@@ -748,6 +778,65 @@ impl Editor {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn drawing_tools_request_the_viewport_that_accepts_their_input() {
+        let mut ed = Editor::new(Arc::new(CommandRegistry::with_all_modules()));
+        for name in ["LINE", "COPY", "DIMLINEAR"] {
+            ed.run_command(name);
+            assert!(
+                std::mem::take(&mut ed.requests)
+                    .contains(&AppRequest::SetWorkspace(Workspace::Drafting))
+            );
+            ed.escape();
+        }
+    }
+
+    #[test]
+    fn replacing_an_identical_document_invalidates_feature_dialogs() {
+        let mut ed = Editor::new(Arc::new(CommandRegistry::new()));
+        let generation = ed.document_generation();
+        ed.set_document(Document::new());
+        assert_ne!(ed.document_generation(), generation);
+        let generation = ed.document_generation();
+        ed.set_document(Document::new());
+        assert_ne!(ed.document_generation(), generation);
+    }
+
+    #[test]
+    fn invalid_points_do_not_reuse_the_previous_cursor_or_change_the_document() {
+        let mut ed = Editor::new(Arc::new(CommandRegistry::with_all_modules()));
+        ed.draft.osnap_on = false;
+        ed.submit("LINE");
+        ed.click(DVec2::ZERO, false);
+        ed.pointer_move(DVec2::X);
+        ed.click(DVec2::new(f64::NAN, 0.0), false);
+        ed.feed(ToolInput::Point(DVec2::new(f64::INFINITY, 0.0)));
+        assert!(ed.doc.drawing.entities.is_empty());
+        assert_eq!(ed.last_point, Some(DVec2::ZERO));
+        assert_eq!(ed.active_tool_name(), Some("LINE"));
+        ed.click(DVec2::X, false);
+        assert_eq!(ed.doc.drawing.entities.len(), 1);
+    }
+
+    #[test]
+    fn preview_buffers_are_reused_and_cleared_when_a_tool_ends() {
+        let mut ed = Editor::new(Arc::new(CommandRegistry::with_all_modules()));
+        ed.submit("LINE");
+        ed.submit("0,0");
+        ed.pointer_move(DVec2::X);
+        let capacity = ed.preview.curves.capacity();
+        assert!(capacity > 0);
+        let buffer = ed.preview.curves.as_ptr();
+        for i in 1..20 {
+            ed.pointer_move(DVec2::new(i as f64, 2.0));
+            assert_eq!(ed.preview.curves.len(), 1);
+            assert_eq!(ed.preview.curves.as_ptr(), buffer);
+        }
+        ed.escape();
+        assert!(ed.preview.is_empty());
+        assert_eq!(ed.preview.curves.capacity(), capacity);
+    }
 
     #[test]
     fn unknown_command_reports_error() {

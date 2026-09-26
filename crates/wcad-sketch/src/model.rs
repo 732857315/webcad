@@ -14,18 +14,52 @@ use wcad_math::DVec2;
 use crate::{Error, Result};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct SkEntityId(pub u32);
+pub struct SkEntityId(#[serde(deserialize_with = "deserialize_sketch_id")] pub u32);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct SkConstraintId(pub u32);
+pub struct SkConstraintId(#[serde(deserialize_with = "deserialize_sketch_id")] pub u32);
+
+// Internally tagged parents buffer JSON map keys as strings, bypassing serde_json's numeric
+// map-key deserializer. Keep writing numeric IDs, but also read their decimal key representation.
+fn deserialize_sketch_id<'de, D>(deserializer: D) -> std::result::Result<u32, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum Id {
+        Number(u32),
+        Key(String),
+    }
+
+    match Id::deserialize(deserializer)? {
+        Id::Number(id) => Ok(id),
+        Id::Key(key) if !key.is_empty() && key.bytes().all(|b| b.is_ascii_digit()) => {
+            key.parse().map_err(serde::de::Error::custom)
+        }
+        Id::Key(_) => Err(serde::de::Error::custom("expected a decimal u32 sketch ID")),
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum SkGeom {
-    Point { p: DVec2 },
-    Line { a: SkEntityId, b: SkEntityId },
-    Circle { c: SkEntityId, r: f64 },
-    Arc { c: SkEntityId, s: SkEntityId, e: SkEntityId },
+    Point {
+        p: DVec2,
+    },
+    Line {
+        a: SkEntityId,
+        b: SkEntityId,
+    },
+    Circle {
+        c: SkEntityId,
+        r: f64,
+    },
+    Arc {
+        c: SkEntityId,
+        s: SkEntityId,
+        e: SkEntityId,
+    },
 }
 
 impl SkGeom {
@@ -83,45 +117,129 @@ pub enum ArcEnd {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum ConstraintKind {
-    Coincident { p1: SkEntityId, p2: SkEntityId },
-    PointOnLine { p: SkEntityId, line: SkEntityId },
+    Coincident {
+        p1: SkEntityId,
+        p2: SkEntityId,
+    },
+    PointOnLine {
+        p: SkEntityId,
+        line: SkEntityId,
+    },
     /// Point on the (full) circle of a circle or arc.
-    PointOnCircle { p: SkEntityId, round: SkEntityId },
-    Horizontal { line: SkEntityId },
-    Vertical { line: SkEntityId },
-    HorizontalPoints { p1: SkEntityId, p2: SkEntityId },
-    VerticalPoints { p1: SkEntityId, p2: SkEntityId },
-    Parallel { line1: SkEntityId, line2: SkEntityId },
-    Perpendicular { line1: SkEntityId, line2: SkEntityId },
+    PointOnCircle {
+        p: SkEntityId,
+        round: SkEntityId,
+    },
+    Horizontal {
+        line: SkEntityId,
+    },
+    Vertical {
+        line: SkEntityId,
+    },
+    HorizontalPoints {
+        p1: SkEntityId,
+        p2: SkEntityId,
+    },
+    VerticalPoints {
+        p1: SkEntityId,
+        p2: SkEntityId,
+    },
+    Parallel {
+        line1: SkEntityId,
+        line2: SkEntityId,
+    },
+    Perpendicular {
+        line1: SkEntityId,
+        line2: SkEntityId,
+    },
     /// Infinite line tangent to a circle/arc.
-    TangentLineCircle { line: SkEntityId, round: SkEntityId },
+    TangentLineCircle {
+        line: SkEntityId,
+        round: SkEntityId,
+    },
     /// Circle/arc tangent to circle/arc (external or internal, whichever is closer).
-    TangentCircles { round1: SkEntityId, round2: SkEntityId },
-    EqualLength { line1: SkEntityId, line2: SkEntityId },
-    EqualRadius { round1: SkEntityId, round2: SkEntityId },
-    Midpoint { p: SkEntityId, line: SkEntityId },
+    TangentCircles {
+        round1: SkEntityId,
+        round2: SkEntityId,
+    },
+    EqualLength {
+        line1: SkEntityId,
+        line2: SkEntityId,
+    },
+    EqualRadius {
+        round1: SkEntityId,
+        round2: SkEntityId,
+    },
+    Midpoint {
+        p: SkEntityId,
+        line: SkEntityId,
+    },
     /// `p1` and `p2` symmetric about the line.
-    Symmetric { p1: SkEntityId, p2: SkEntityId, line: SkEntityId },
+    Symmetric {
+        p1: SkEntityId,
+        p2: SkEntityId,
+        line: SkEntityId,
+    },
     /// The point does not move (its stored position is the anchor).
-    Fix { p: SkEntityId },
-    Distance { p1: SkEntityId, p2: SkEntityId, value: DimValue },
+    Fix {
+        p: SkEntityId,
+    },
+    Distance {
+        p1: SkEntityId,
+        p2: SkEntityId,
+        value: DimValue,
+    },
     /// `|x2 - x1| = value`.
-    HorizontalDistance { p1: SkEntityId, p2: SkEntityId, value: DimValue },
+    HorizontalDistance {
+        p1: SkEntityId,
+        p2: SkEntityId,
+        value: DimValue,
+    },
     /// `|y2 - y1| = value`.
-    VerticalDistance { p1: SkEntityId, p2: SkEntityId, value: DimValue },
+    VerticalDistance {
+        p1: SkEntityId,
+        p2: SkEntityId,
+        value: DimValue,
+    },
     /// Unsigned distance of a point from the infinite line.
-    PointLineDistance { p: SkEntityId, line: SkEntityId, value: DimValue },
-    Length { line: SkEntityId, value: DimValue },
+    PointLineDistance {
+        p: SkEntityId,
+        line: SkEntityId,
+        value: DimValue,
+    },
+    Length {
+        line: SkEntityId,
+        value: DimValue,
+    },
     /// Signed angle (radians, CCW) from the direction of `line1` to the direction of `line2`,
     /// modulo π (a line reversed by the solver still satisfies it).
-    Angle { line1: SkEntityId, line2: SkEntityId, value: DimValue },
-    Radius { round: SkEntityId, value: DimValue },
-    Diameter { round: SkEntityId, value: DimValue },
+    Angle {
+        line1: SkEntityId,
+        line2: SkEntityId,
+        value: DimValue,
+    },
+    Radius {
+        round: SkEntityId,
+        value: DimValue,
+    },
+    Diameter {
+        round: SkEntityId,
+        value: DimValue,
+    },
     /// Smooth joint: the radius of the arc at `end` is perpendicular to the line. Endpoint
     /// coincidence is a separate constraint (or a shared point).
-    TangentArcLine { arc: SkEntityId, end: ArcEnd, line: SkEntityId },
+    TangentArcLine {
+        arc: SkEntityId,
+        end: ArcEnd,
+        line: SkEntityId,
+    },
     /// Smooth joint of two arcs: their radii at the given ends are collinear.
-    TangentArcArc { arc1: SkEntityId, end1: ArcEnd, arc2: SkEntityId, end2: ArcEnd },
+    TangentArcArc {
+        arc1: SkEntityId,
+        end1: ArcEnd,
+        arc2: SkEntityId,
+        end2: ArcEnd,
+    },
 }
 
 /// Expected geometry of a constraint argument.
@@ -146,11 +264,15 @@ impl ConstraintKind {
             | K::Distance { p1, p2, .. }
             | K::HorizontalDistance { p1, p2, .. }
             | K::VerticalDistance { p1, p2, .. } => vec![(p1, A::Point), (p2, A::Point)],
-            K::PointOnLine { p, line } | K::Midpoint { p, line } | K::PointLineDistance { p, line, .. } => {
+            K::PointOnLine { p, line }
+            | K::Midpoint { p, line }
+            | K::PointLineDistance { p, line, .. } => {
                 vec![(p, A::Point), (line, A::Line)]
             }
             K::PointOnCircle { p, round } => vec![(p, A::Point), (round, A::Round)],
-            K::Horizontal { line } | K::Vertical { line } | K::Length { line, .. } => vec![(line, A::Line)],
+            K::Horizontal { line } | K::Vertical { line } | K::Length { line, .. } => {
+                vec![(line, A::Line)]
+            }
             K::Parallel { line1, line2 }
             | K::Perpendicular { line1, line2 }
             | K::EqualLength { line1, line2 }
@@ -298,10 +420,19 @@ impl Sketch {
 
     fn alloc_entity(&mut self, geom: SkGeom) -> SkEntityId {
         // Robust against files whose counter lags behind the stored ids: ids are never reused.
-        let floor = self.entities.last_key_value().map_or(0, |(k, _)| k.0.saturating_add(1));
+        let floor = self
+            .entities
+            .last_key_value()
+            .map_or(0, |(k, _)| k.0.saturating_add(1));
         let id = SkEntityId(self.next_entity.max(floor));
         self.next_entity = id.0.saturating_add(1);
-        self.entities.insert(id, SkEntity { geom, construction: false });
+        self.entities.insert(
+            id,
+            SkEntity {
+                geom,
+                construction: false,
+            },
+        );
         id
     }
 
@@ -325,10 +456,20 @@ impl Sketch {
     /// Adds a constraint without validation (see [`Sketch::add_constraint_checked`]). Invalid
     /// constraints are ignored by the solver and listed in [`crate::SolveReport::invalid`].
     pub fn add_constraint(&mut self, kind: ConstraintKind) -> SkConstraintId {
-        let floor = self.constraints.last_key_value().map_or(0, |(k, _)| k.0.saturating_add(1));
+        let floor = self
+            .constraints
+            .last_key_value()
+            .map_or(0, |(k, _)| k.0.saturating_add(1));
         let id = SkConstraintId(self.next_constraint.max(floor));
         self.next_constraint = id.0.saturating_add(1);
-        self.constraints.insert(id, SkConstraint { kind, enabled: true, driving: true });
+        self.constraints.insert(
+            id,
+            SkConstraint {
+                kind,
+                enabled: true,
+                driving: true,
+            },
+        );
         id
     }
 
@@ -341,7 +482,10 @@ impl Sketch {
     /// Adds a reference (non-driving) dimension; see [`Sketch::measure`].
     pub fn add_reference_dimension(&mut self, kind: ConstraintKind) -> Result<SkConstraintId> {
         if !kind.is_dimensional() {
-            return Err(Error::BadConstraint(format!("{} is not a dimension", kind.type_name())));
+            return Err(Error::BadConstraint(format!(
+                "{} is not a dimension",
+                kind.type_name()
+            )));
         }
         let id = self.add_constraint_checked(kind)?;
         if let Some(c) = self.constraints.get_mut(&id) {
@@ -366,7 +510,11 @@ impl Sketch {
                     | (ArgKind::Arc, SkGeom::Arc { .. })
             );
             if !ok {
-                return bad(format!("{}: entity {} must be a {want:?}", kind.type_name(), id.0));
+                return bad(format!(
+                    "{}: entity {} must be a {want:?}",
+                    kind.type_name(),
+                    id.0
+                ));
             }
             // Curves must be well formed (their points exist) for the solver to use them.
             for p in e.geom.defining_points() {
@@ -389,10 +537,14 @@ impl Sketch {
             | K::Perpendicular { line1, line2 }
             | K::EqualLength { line1, line2 }
             | K::Angle { line1, line2, .. } => same(line1, line2),
-            K::TangentCircles { round1, round2 } | K::EqualRadius { round1, round2 } => same(round1, round2),
+            K::TangentCircles { round1, round2 } | K::EqualRadius { round1, round2 } => {
+                same(round1, round2)
+            }
             K::TangentArcArc { arc1, arc2, .. } => same(arc1, arc2),
             K::Symmetric { p1, p2, .. } => same(p1, p2),
-            K::PointOnLine { p, line } | K::Midpoint { p, line } | K::PointLineDistance { p, line, .. } => {
+            K::PointOnLine { p, line }
+            | K::Midpoint { p, line }
+            | K::PointLineDistance { p, line, .. } => {
                 self.line_ends(line).is_some_and(|(a, b)| a == p || b == p)
             }
             _ => false,
@@ -441,7 +593,11 @@ impl Sketch {
             self.add_constraint(ConstraintKind::Vertical { line: lines[1] }),
             self.add_constraint(ConstraintKind::Vertical { line: lines[3] }),
         ];
-        RectangleIds { lines, corners, constraints }
+        RectangleIds {
+            lines,
+            corners,
+            constraints,
+        }
     }
 
     /// Circle with a new center point.
@@ -456,7 +612,9 @@ impl Sketch {
         let r = c.distance(s);
         let de = e - c;
         if !(r > 0.0) || !r.is_finite() || !(de.length() > 0.0) || !de.is_finite() {
-            return Err(Error::Degenerate("arc needs distinct center, start and end".into()));
+            return Err(Error::Degenerate(
+                "arc needs distinct center, start and end".into(),
+            ));
         }
         let e = c + de.normalize() * r;
         let pc = self.add_point(c);
@@ -534,31 +692,53 @@ impl Sketch {
     }
 
     pub fn remove_constraint(&mut self, id: SkConstraintId) -> Result<SkConstraint> {
-        self.constraints.remove(&id).ok_or(Error::UnknownConstraint(id))
+        self.constraints
+            .remove(&id)
+            .ok_or(Error::UnknownConstraint(id))
     }
 
     pub fn set_enabled(&mut self, id: SkConstraintId, on: bool) -> Result<()> {
-        let c = self.constraints.get_mut(&id).ok_or(Error::UnknownConstraint(id))?;
+        let c = self
+            .constraints
+            .get_mut(&id)
+            .ok_or(Error::UnknownConstraint(id))?;
         c.enabled = on;
         Ok(())
     }
 
     /// Switch a dimension between driving and reference.
     pub fn set_driving(&mut self, id: SkConstraintId, driving: bool) -> Result<()> {
-        let c = self.constraints.get_mut(&id).ok_or(Error::UnknownConstraint(id))?;
+        let c = self
+            .constraints
+            .get_mut(&id)
+            .ok_or(Error::UnknownConstraint(id))?;
         if !driving && !c.kind.is_dimensional() {
-            return Err(Error::BadConstraint(format!("{} is not a dimension", c.kind.type_name())));
+            return Err(Error::BadConstraint(format!(
+                "{} is not a dimension",
+                c.kind.type_name()
+            )));
         }
         c.driving = driving;
         Ok(())
     }
 
     /// Change the value of a dimensional constraint (keeps the expression text if `expr` is `None`).
-    pub fn set_dimension(&mut self, id: SkConstraintId, value: f64, expr: Option<String>) -> Result<()> {
-        let c = self.constraints.get(&id).ok_or(Error::UnknownConstraint(id))?;
+    pub fn set_dimension(
+        &mut self,
+        id: SkConstraintId,
+        value: f64,
+        expr: Option<String>,
+    ) -> Result<()> {
+        let c = self
+            .constraints
+            .get(&id)
+            .ok_or(Error::UnknownConstraint(id))?;
         let mut kind = c.kind.clone();
         let Some(v) = kind.dim_value_mut() else {
-            return Err(Error::BadConstraint(format!("{} is not a dimension", c.kind.type_name())));
+            return Err(Error::BadConstraint(format!(
+                "{} is not a dimension",
+                c.kind.type_name()
+            )));
         };
         v.value = value;
         if expr.is_some() {
@@ -584,7 +764,10 @@ impl Sketch {
                 *q = p;
                 Ok(())
             }
-            Some(_) => Err(Error::BadConstraint(format!("entity {} is not a point", id.0))),
+            Some(_) => Err(Error::BadConstraint(format!(
+                "entity {} is not a point",
+                id.0
+            ))),
             None => Err(Error::UnknownEntity(id)),
         }
     }
@@ -596,7 +779,10 @@ impl Sketch {
                 *q = r;
                 Ok(())
             }
-            Some(_) => Err(Error::BadConstraint(format!("entity {} is not a circle", id.0))),
+            Some(_) => Err(Error::BadConstraint(format!(
+                "entity {} is not a circle",
+                id.0
+            ))),
             None => Err(Error::UnknownEntity(id)),
         }
     }

@@ -1,7 +1,9 @@
 //! Solver behaviour on whole sketches (ported from the prototype's tests to the model API).
 
 use wcad_math::DVec2;
-use wcad_sketch::{ArcEnd, ConstraintKind as K, DimValue, EntityStatus, SkConstraintId, SkEntityId, Sketch};
+use wcad_sketch::{
+    ArcEnd, ConstraintKind as K, DimValue, EntityStatus, SkConstraintId, SkEntityId, Sketch,
+};
 
 fn v(x: f64, y: f64) -> DVec2 {
     DVec2::new(x, y)
@@ -18,7 +20,10 @@ fn pt(sk: &Sketch, p: SkEntityId) -> DVec2 {
 #[track_caller]
 fn assert_pt(sk: &Sketch, p: SkEntityId, want: DVec2, tol: f64) {
     let got = pt(sk, p);
-    assert!(got.distance(want) <= tol, "point {p:?}: got {got:?} want {want:?}");
+    assert!(
+        got.distance(want) <= tol,
+        "point {p:?}: got {got:?} want {want:?}"
+    );
 }
 
 fn add(sk: &mut Sketch, k: K) -> SkConstraintId {
@@ -73,8 +78,22 @@ fn fully_constrained_rectangle_dof0() {
     let r = rect(&mut sk, 0.3, -0.2, 9.0, 5.5, 0.1);
     let [p0, p1, p2, p3] = r.corners;
     fix_at(&mut sk, p0, 0.0, 0.0);
-    add(&mut sk, K::Distance { p1: p0, p2: p1, value: dim(10.0) });
-    add(&mut sk, K::Distance { p1, p2, value: dim(5.0) });
+    add(
+        &mut sk,
+        K::Distance {
+            p1: p0,
+            p2: p1,
+            value: dim(10.0),
+        },
+    );
+    add(
+        &mut sk,
+        K::Distance {
+            p1,
+            p2,
+            value: dim(5.0),
+        },
+    );
     let rep = sk.solve();
     assert!(rep.converged, "{rep:?}");
     assert_pt(&sk, p0, v(0.0, 0.0), 1e-9);
@@ -99,24 +118,69 @@ fn tangent_arc_chain() {
     let (l0a, l0b) = ends(&sk, l0);
     fix_at(&mut sk, l0a, 0.0, 0.0);
     add(&mut sk, K::Horizontal { line: l0 });
-    add(&mut sk, K::Distance { p1: l0a, p2: l0b, value: dim(10.0) });
+    add(
+        &mut sk,
+        K::Distance {
+            p1: l0a,
+            p2: l0b,
+            value: dim(10.0),
+        },
+    );
     // arc 1: CCW from its start (tangent to l0 end) up to angle ~0
-    let a1 = sk.add_arc_center_start_end(v(10.3, 4.8), v(10.2, 0.1), v(14.8, 5.3)).unwrap();
+    let a1 = sk
+        .add_arc_center_start_end(v(10.3, 4.8), v(10.2, 0.1), v(14.8, 5.3))
+        .unwrap();
     let [c1, s1, e1] = sk.arc_points(a1).unwrap();
     add(&mut sk, K::Coincident { p1: s1, p2: l0b });
-    add(&mut sk, K::TangentArcLine { arc: a1, end: ArcEnd::Start, line: l0 });
-    add(&mut sk, K::Radius { round: a1, value: dim(5.0) });
+    add(
+        &mut sk,
+        K::TangentArcLine {
+            arc: a1,
+            end: ArcEnd::Start,
+            line: l0,
+        },
+    );
+    add(
+        &mut sk,
+        K::Radius {
+            round: a1,
+            value: dim(5.0),
+        },
+    );
     // arc 2 continues from arc 1 end, tangent, radius 3
-    let a2 = sk.add_arc_center_start_end(v(12.2, 5.1), v(15.1, 5.2), v(12.1, 8.2)).unwrap();
+    let a2 = sk
+        .add_arc_center_start_end(v(12.2, 5.1), v(15.1, 5.2), v(12.1, 8.2))
+        .unwrap();
     let [c2, s2, e2] = sk.arc_points(a2).unwrap();
     add(&mut sk, K::Coincident { p1: s2, p2: e1 });
-    add(&mut sk, K::TangentArcArc { arc1: a1, end1: ArcEnd::End, arc2: a2, end2: ArcEnd::Start });
-    add(&mut sk, K::Radius { round: a2, value: dim(3.0) });
+    add(
+        &mut sk,
+        K::TangentArcArc {
+            arc1: a1,
+            end1: ArcEnd::End,
+            arc2: a2,
+            end2: ArcEnd::Start,
+        },
+    );
+    add(
+        &mut sk,
+        K::Radius {
+            round: a2,
+            value: dim(3.0),
+        },
+    );
     // line leaving arc 2 end tangentially
     let l1 = sk.add_line_points(v(12.0, 8.1), v(5.0, 8.3));
     let (l1a, l1b) = ends(&sk, l1);
     add(&mut sk, K::Coincident { p1: l1a, p2: e2 });
-    add(&mut sk, K::TangentArcLine { arc: a2, end: ArcEnd::End, line: l1 });
+    add(
+        &mut sk,
+        K::TangentArcLine {
+            arc: a2,
+            end: ArcEnd::End,
+            line: l1,
+        },
+    );
 
     let rep = sk.solve();
     assert!(rep.converged, "{rep:?}");
@@ -138,7 +202,11 @@ fn tangent_arc_chain() {
     assert!(d.is_fully_constrained(l0));
     assert_eq!(d.status(l1), Some(EntityStatus::UnderConstrained));
     // minimal movement: arc 1 end stays close to where it started (~angle 0)
-    assert!(pt(&sk, e1).distance(v(15.0, 5.0)) < 0.5, "{:?}", pt(&sk, e1));
+    assert!(
+        pt(&sk, e1).distance(v(15.0, 5.0)) < 0.5,
+        "{:?}",
+        pt(&sk, e1)
+    );
 }
 
 #[test]
@@ -150,7 +218,14 @@ fn conflicting_fixes_and_distance_are_identified() {
     let fp = add(&mut sk, K::Fix { p });
     let fq = add(&mut sk, K::Fix { p: q });
     let _ok = add(&mut sk, K::Fix { p: other });
-    let dist = add(&mut sk, K::Distance { p1: p, p2: q, value: dim(5.0) });
+    let dist = add(
+        &mut sk,
+        K::Distance {
+            p1: p,
+            p2: q,
+            value: dim(5.0),
+        },
+    );
     let rep = sk.solve();
     assert!(!rep.converged);
     assert!(rep.unsatisfied.contains(&dist));
@@ -172,15 +247,40 @@ fn over_constrained_rectangle_reports_conflict_set() {
     let r = rect(&mut sk, 0.0, 0.0, 10.0, 5.0, 0.05);
     let [p0, p1, p2, _] = r.corners;
     fix_at(&mut sk, p0, 0.0, 0.0);
-    let w = add(&mut sk, K::Distance { p1: p0, p2: p1, value: dim(10.0) });
-    let h = add(&mut sk, K::Distance { p1, p2, value: dim(5.0) });
-    let diag = add(&mut sk, K::Distance { p1: p0, p2, value: dim(20.0) }); // should be sqrt(125)
+    let w = add(
+        &mut sk,
+        K::Distance {
+            p1: p0,
+            p2: p1,
+            value: dim(10.0),
+        },
+    );
+    let h = add(
+        &mut sk,
+        K::Distance {
+            p1,
+            p2,
+            value: dim(5.0),
+        },
+    );
+    let diag = add(
+        &mut sk,
+        K::Distance {
+            p1: p0,
+            p2,
+            value: dim(20.0),
+        },
+    ); // should be sqrt(125)
     let rep = sk.solve();
     assert!(!rep.converged);
     let d = sk.diagnose();
     assert_eq!(d.conflicting_dependents, vec![diag], "{d:?}");
     for c in [w, h, diag] {
-        assert!(d.conflicting.contains(&c), "{c:?} missing from {:?}", d.conflicting);
+        assert!(
+            d.conflicting.contains(&c),
+            "{c:?} missing from {:?}",
+            d.conflicting
+        );
     }
     assert_eq!(d.status(p2), Some(EntityStatus::OverConstrained));
     // disabling the offending dimension makes it solvable again
@@ -205,10 +305,22 @@ fn non_intersecting_circles_conflict() {
     let p = sk.add_point(v(2.0, 0.5));
     let cc1 = sk.center_of(c1).unwrap();
     add(&mut sk, K::Fix { p: cc1 });
-    add(&mut sk, K::Radius { round: c1, value: dim(1.0) });
+    add(
+        &mut sk,
+        K::Radius {
+            round: c1,
+            value: dim(1.0),
+        },
+    );
     let cc2 = sk.center_of(c2).unwrap();
     add(&mut sk, K::Fix { p: cc2 });
-    add(&mut sk, K::Radius { round: c2, value: dim(1.0) });
+    add(
+        &mut sk,
+        K::Radius {
+            round: c2,
+            value: dim(1.0),
+        },
+    );
     let on1 = add(&mut sk, K::PointOnCircle { p, round: c1 });
     let on2 = add(&mut sk, K::PointOnCircle { p, round: c2 });
     assert!(!sk.solve().converged);
@@ -225,10 +337,36 @@ fn redundant_but_consistent() {
     let r = rect(&mut sk, 0.2, 0.1, 10.0, 5.0, 0.1);
     let [p0, p1, p2, _] = r.corners;
     fix_at(&mut sk, p0, 0.0, 0.0);
-    add(&mut sk, K::Distance { p1: p0, p2: p1, value: dim(10.0) });
-    add(&mut sk, K::Distance { p1, p2, value: dim(5.0) });
-    let eq = add(&mut sk, K::EqualLength { line1: r.lines[0], line2: r.lines[2] });
-    let par = add(&mut sk, K::Parallel { line1: r.lines[1], line2: r.lines[3] });
+    add(
+        &mut sk,
+        K::Distance {
+            p1: p0,
+            p2: p1,
+            value: dim(10.0),
+        },
+    );
+    add(
+        &mut sk,
+        K::Distance {
+            p1,
+            p2,
+            value: dim(5.0),
+        },
+    );
+    let eq = add(
+        &mut sk,
+        K::EqualLength {
+            line1: r.lines[0],
+            line2: r.lines[2],
+        },
+    );
+    let par = add(
+        &mut sk,
+        K::Parallel {
+            line1: r.lines[1],
+            line2: r.lines[3],
+        },
+    );
     let rep = sk.solve();
     assert!(rep.converged, "{rep:?}");
     let d = sk.diagnose();
@@ -269,7 +407,11 @@ fn drag_under_constrained_rectangle() {
         let cur = v(4.0 + 3.0 * t, 2.0 + 1.0 * t);
         let rep = sk.drag(p2, cur);
         assert!(rep.converged, "{rep:?}");
-        assert!(pt(&sk, p2).distance(cur) < 1e-4, "{:?} vs {cur:?}", pt(&sk, p2));
+        assert!(
+            pt(&sk, p2).distance(cur) < 1e-4,
+            "{:?} vs {cur:?}",
+            pt(&sk, p2)
+        );
     }
     assert_pt(&sk, p0, v(0.0, 0.0), 1e-12);
     assert_pt(&sk, p1, v(7.0, 0.0), 1e-4);
@@ -283,7 +425,14 @@ fn drag_constrained_point_projects_onto_locus() {
     let l = sk.add_line_points(v(0.0, 0.0), v(10.0, 0.0));
     let (a, b) = ends(&sk, l);
     add(&mut sk, K::Fix { p: a });
-    add(&mut sk, K::Distance { p1: a, p2: b, value: dim(10.0) });
+    add(
+        &mut sk,
+        K::Distance {
+            p1: a,
+            p2: b,
+            value: dim(10.0),
+        },
+    );
     let rep = sk.drag(b, v(20.0, 5.0));
     assert!(rep.converged);
     let n = 20f64.hypot(5.0);
@@ -305,15 +454,22 @@ fn drag_fixed_point_does_not_move() {
     assert!(!sk.drag(l, v(1.0, 1.0)).converged); // not a point
 }
 
-
 #[test]
 fn drag_arc_endpoint_keeps_orientation() {
     // Arc with fixed center; dragging the end far across the chord must not flip start/end.
     let mut sk = Sketch::new();
-    let arc = sk.add_arc_center_start_end(v(0.0, 0.0), v(5.0, 0.0), v(0.0, 5.0)).unwrap();
+    let arc = sk
+        .add_arc_center_start_end(v(0.0, 0.0), v(5.0, 0.0), v(0.0, 5.0))
+        .unwrap();
     let [c, s, e] = sk.arc_points(arc).unwrap();
     add(&mut sk, K::Fix { p: c });
-    add(&mut sk, K::Radius { round: arc, value: dim(5.0) });
+    add(
+        &mut sk,
+        K::Radius {
+            round: arc,
+            value: dim(5.0),
+        },
+    );
     assert!(sk.solve().converged);
     // move the end around CCW in small steps up to ~300 degrees
     for k in 1..=60 {
@@ -321,7 +477,10 @@ fn drag_arc_endpoint_keeps_orientation() {
         let rep = sk.drag(e, v(6.0 * ang.cos(), 6.0 * ang.sin()));
         assert!(rep.converged);
         let sweep = sweep_of(&sk, c, s, e);
-        assert!((sweep - ang).abs() < 1e-6, "step {k}: sweep {sweep} want {ang}");
+        assert!(
+            (sweep - ang).abs() < 1e-6,
+            "step {k}: sweep {sweep} want {ang}"
+        );
     }
     assert_pt(&sk, s, v(5.0, 0.0), 1e-6);
 }
@@ -331,7 +490,6 @@ fn sweep_of(sk: &Sketch, c: SkEntityId, s: SkEntityId, e: SkEntityId) -> f64 {
     wcad_math::normalize_0_2pi((e - c).to_angle() - (s - c).to_angle())
 }
 
-
 #[test]
 fn fixed_point_with_distance_dimensions() {
     let mut sk = Sketch::new();
@@ -339,10 +497,31 @@ fn fixed_point_with_distance_dimensions() {
     let p1 = sk.add_point(v(5.5, 2.3));
     let p2 = sk.add_point(v(5.8, 5.4));
     fix_at(&mut sk, p0, 1.0, 2.0);
-    add(&mut sk, K::Distance { p1: p0, p2: p1, value: dim(5.0) });
+    add(
+        &mut sk,
+        K::Distance {
+            p1: p0,
+            p2: p1,
+            value: dim(5.0),
+        },
+    );
     add(&mut sk, K::HorizontalPoints { p1: p0, p2: p1 });
-    add(&mut sk, K::Distance { p1, p2, value: dim(3.0) });
-    add(&mut sk, K::Distance { p1: p0, p2, value: dim(4.0) });
+    add(
+        &mut sk,
+        K::Distance {
+            p1,
+            p2,
+            value: dim(3.0),
+        },
+    );
+    add(
+        &mut sk,
+        K::Distance {
+            p1: p0,
+            p2,
+            value: dim(4.0),
+        },
+    );
     assert!(sk.solve().converged);
     assert_pt(&sk, p0, v(1.0, 2.0), 1e-9);
     assert_pt(&sk, p1, v(6.0, 2.0), 1e-9);
@@ -376,52 +555,157 @@ fn all_constraint_kinds() {
     add(&mut sk, K::Fix { p: l1b });
     let p = sk.add_point(v(3.2, 0.5));
     add(&mut sk, K::PointOnLine { p, line: l1 });
-    add(&mut sk, K::Distance { p1: l1a, p2: p, value: dim(3.0) });
+    add(
+        &mut sk,
+        K::Distance {
+            p1: l1a,
+            p2: p,
+            value: dim(3.0),
+        },
+    );
     let m = sk.add_point(v(4.0, 0.3));
     add(&mut sk, K::Midpoint { p: m, line: l1 });
     let c1 = sk.add_circle_center_radius(v(5.3, 4.4), 3.7);
-    add(&mut sk, K::TangentLineCircle { line: l1, round: c1 });
-    add(&mut sk, K::Radius { round: c1, value: dim(4.0) });
+    add(
+        &mut sk,
+        K::TangentLineCircle {
+            line: l1,
+            round: c1,
+        },
+    );
+    add(
+        &mut sk,
+        K::Radius {
+            round: c1,
+            value: dim(4.0),
+        },
+    );
     let cc1 = sk.center_of(c1).unwrap();
     add(&mut sk, K::VerticalPoints { p1: cc1, p2: m });
     let c2 = sk.add_circle_center_radius(v(11.4, 4.3), 2.2);
-    add(&mut sk, K::TangentCircles { round1: c1, round2: c2 });
-    add(&mut sk, K::Diameter { round: c2, value: dim(4.0) });
+    add(
+        &mut sk,
+        K::TangentCircles {
+            round1: c1,
+            round2: c2,
+        },
+    );
+    add(
+        &mut sk,
+        K::Diameter {
+            round: c2,
+            value: dim(4.0),
+        },
+    );
     let cc2 = sk.center_of(c2).unwrap();
     add(&mut sk, K::HorizontalPoints { p1: cc1, p2: cc2 });
     let l2 = sk.add_line_points(v(0.3, 0.2), v(0.5, 5.5));
     let (l2a, l2b) = ends(&sk, l2);
-    add(&mut sk, K::Perpendicular { line1: l2, line2: l1 });
+    add(
+        &mut sk,
+        K::Perpendicular {
+            line1: l2,
+            line2: l1,
+        },
+    );
     add(&mut sk, K::Coincident { p1: l2a, p2: l1a });
-    add(&mut sk, K::Length { line: l2, value: dim(6.0) });
+    add(
+        &mut sk,
+        K::Length {
+            line: l2,
+            value: dim(6.0),
+        },
+    );
     let l3 = sk.add_line_points(v(0.5, 6.5), v(5.5, 9.4));
     let (l3a, l3b) = ends(&sk, l3);
-    add(&mut sk, K::Angle { line1: l1, line2: l3, value: dim(PI / 6.0) });
+    add(
+        &mut sk,
+        K::Angle {
+            line1: l1,
+            line2: l3,
+            value: dim(PI / 6.0),
+        },
+    );
     add(&mut sk, K::Coincident { p1: l3a, p2: l2b });
-    add(&mut sk, K::EqualLength { line1: l3, line2: l2 });
+    add(
+        &mut sk,
+        K::EqualLength {
+            line1: l3,
+            line2: l2,
+        },
+    );
     let q = sk.add_point(v(12.9, 5.3));
     add(&mut sk, K::PointOnCircle { p: q, round: c2 });
-    add(&mut sk, K::PointLineDistance { p: q, line: l1, value: dim(5.0) });
+    add(
+        &mut sk,
+        K::PointLineDistance {
+            p: q,
+            line: l1,
+            value: dim(5.0),
+        },
+    );
     let s1 = sk.add_point(v(-2.0, 3.0));
     let s2 = sk.add_point(v(2.3, 2.6));
     add(&mut sk, K::Fix { p: s1 });
-    add(&mut sk, K::Symmetric { p1: s1, p2: s2, line: l2 });
+    add(
+        &mut sk,
+        K::Symmetric {
+            p1: s1,
+            p2: s2,
+            line: l2,
+        },
+    );
     let l4 = sk.add_line_points(v(3.0, -2.0), v(7.0, -2.5));
     let (l4a, l4b) = ends(&sk, l4);
-    add(&mut sk, K::Parallel { line1: l4, line2: l1 });
+    add(
+        &mut sk,
+        K::Parallel {
+            line1: l4,
+            line2: l1,
+        },
+    );
     add(&mut sk, K::Fix { p: l4a });
-    add(&mut sk, K::Distance { p1: l4a, p2: l4b, value: dim(4.0) });
-    let arc = sk.add_arc_center_start_end(v(20.0, 0.0), v(23.0, 0.2), v(20.1, 3.1)).unwrap();
+    add(
+        &mut sk,
+        K::Distance {
+            p1: l4a,
+            p2: l4b,
+            value: dim(4.0),
+        },
+    );
+    let arc = sk
+        .add_arc_center_start_end(v(20.0, 0.0), v(23.0, 0.2), v(20.1, 3.1))
+        .unwrap();
     let [ac, _, ae] = sk.arc_points(arc).unwrap();
     add(&mut sk, K::Fix { p: ac });
-    add(&mut sk, K::EqualRadius { round1: arc, round2: c2 });
+    add(
+        &mut sk,
+        K::EqualRadius {
+            round1: arc,
+            round2: c2,
+        },
+    );
     let pa = sk.add_point(v(22.2, 2.3));
     add(&mut sk, K::PointOnCircle { p: pa, round: arc });
     let h1 = sk.add_point(v(30.0, 0.0));
     let h2 = sk.add_point(v(33.0, 1.0));
     add(&mut sk, K::Fix { p: h1 });
-    add(&mut sk, K::HorizontalDistance { p1: h1, p2: h2, value: dim(2.5) });
-    add(&mut sk, K::VerticalDistance { p1: h1, p2: h2, value: dim(1.5) });
+    add(
+        &mut sk,
+        K::HorizontalDistance {
+            p1: h1,
+            p2: h2,
+            value: dim(2.5),
+        },
+    );
+    add(
+        &mut sk,
+        K::VerticalDistance {
+            p1: h1,
+            p2: h2,
+            value: dim(1.5),
+        },
+    );
 
     let rep = sk.solve();
     assert!(rep.converged, "{rep:?}");
@@ -448,8 +732,16 @@ fn all_constraint_kinds() {
     for (&id, c) in &sk.constraints {
         if let Some(dv) = c.kind.dim_value() {
             let got = sk.measure(id);
-            let want = if matches!(c.kind, K::Angle { .. }) { dv.value } else { dv.value.abs() };
-            assert!((got - want).abs() < 1e-9, "{id:?} {}: {got} vs {want}", c.kind.type_name());
+            let want = if matches!(c.kind, K::Angle { .. }) {
+                dv.value
+            } else {
+                dv.value.abs()
+            };
+            assert!(
+                (got - want).abs() < 1e-9,
+                "{id:?} {}: {got} vs {want}",
+                c.kind.type_name()
+            );
         }
     }
 }
@@ -478,8 +770,19 @@ fn circle_center_radius_dimensions_and_reference() {
     let c = sk.add_circle_center_radius(v(1.0, 1.0), 3.0);
     let cen = sk.center_of(c).unwrap();
     add(&mut sk, K::Fix { p: cen });
-    let dia = add(&mut sk, K::Diameter { round: c, value: dim(10.0) });
-    let reference = sk.add_reference_dimension(K::Radius { round: c, value: dim(1.0) }).unwrap();
+    let dia = add(
+        &mut sk,
+        K::Diameter {
+            round: c,
+            value: dim(10.0),
+        },
+    );
+    let reference = sk
+        .add_reference_dimension(K::Radius {
+            round: c,
+            value: dim(1.0),
+        })
+        .unwrap();
     let rep = sk.solve();
     assert!(rep.converged);
     assert!((sk.radius_of(c).unwrap() - 5.0).abs() < 1e-9);
@@ -499,7 +802,13 @@ fn drag_whole_line_and_circle() {
     let l = sk.add_line_points(v(0.0, 0.0), v(10.0, 0.0));
     let (a, b) = ends(&sk, l);
     add(&mut sk, K::Horizontal { line: l });
-    add(&mut sk, K::Length { line: l, value: dim(10.0) });
+    add(
+        &mut sk,
+        K::Length {
+            line: l,
+            value: dim(10.0),
+        },
+    );
     let c = sk.add_circle_center_radius(v(5.0, 5.0), 2.0);
     let t = add(&mut sk, K::TangentLineCircle { line: l, round: c });
     assert!(sk.solve().converged);
@@ -525,25 +834,45 @@ fn solve_keeps_short_arc_from_perturbed_starts() {
     // solver must end on the short one.
     let mut s: u64 = 99;
     let mut rnd = move || {
-        s = s.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        s = s
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         (s >> 11) as f64 / (1u64 << 53) as f64 * 2.0 - 1.0
     };
     for trial in 0..40 {
         let amp = 0.05 + 0.02 * trial as f64;
         let mut sk = Sketch::new();
         let c = v(rnd() * amp, rnd() * amp);
-        let arc = sk.add_arc_center_start_end(c, v(2.0, 0.0), v(rnd() * amp, 2.0 + rnd() * amp)).unwrap();
+        let arc = sk
+            .add_arc_center_start_end(c, v(2.0, 0.0), v(rnd() * amp, 2.0 + rnd() * amp))
+            .unwrap();
         let [pc, ps, pe] = sk.arc_points(arc).unwrap();
         add(&mut sk, K::Fix { p: ps });
-        add(&mut sk, K::Radius { round: arc, value: dim(2.0) });
-        add(&mut sk, K::Distance { p1: ps, p2: pe, value: dim(3.0) });
+        add(
+            &mut sk,
+            K::Radius {
+                round: arc,
+                value: dim(2.0),
+            },
+        );
+        add(
+            &mut sk,
+            K::Distance {
+                p1: ps,
+                p2: pe,
+                value: dim(3.0),
+            },
+        );
         let sweep0 = sweep_of(&sk, pc, ps, pe);
         assert!(sweep0 < std::f64::consts::PI);
         let rep = sk.solve();
         assert!(rep.converged, "{rep:?}");
         let sweep1 = sweep_of(&sk, pc, ps, pe);
         let want = 2.0 * 0.75f64.asin();
-        assert!((sweep1 - want).abs() < 1e-6, "trial {trial}: {sweep0} -> {sweep1}");
+        assert!(
+            (sweep1 - want).abs() < 1e-6,
+            "trial {trial}: {sweep0} -> {sweep1}"
+        );
     }
 }
 

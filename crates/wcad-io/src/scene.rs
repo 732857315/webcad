@@ -5,8 +5,8 @@
 //! dimensions to graphics and hatches to fills or pattern lines.
 
 use wcad_doc::{
-    Color, DimStyle, Drawing, Entity, EntityKind, HAlign, LayerId, LineWeight, LinetypeId, LinetypeRef, TextStyleId,
-    VAlign,
+    Color, DimStyle, Drawing, Entity, EntityKind, HAlign, LayerId, LineWeight, LinetypeId,
+    LinetypeRef, TextStyleId, VAlign,
 };
 use wcad_geom2d::Curve2;
 use wcad_math::{BBox2, DAffine2, DVec2};
@@ -111,7 +111,13 @@ const MAX_VISITS: usize = 5_000_000;
 const MAX_ITEMS: usize = 2_000_000;
 
 pub(crate) fn build(d: &Drawing, opt: SceneOptions) -> Scene {
-    let mut b = Builder { d, opt, layer0: d.layer_by_name("0"), scene: Scene::default(), visits: 0 };
+    let mut b = Builder {
+        d,
+        opt,
+        layer0: d.layer_by_name("0"),
+        scene: Scene::default(),
+        visits: 0,
+    };
     let root = Ctx {
         m: DAffine2::IDENTITY,
         layer: None,
@@ -148,7 +154,9 @@ impl Builder<'_> {
             return;
         }
         let layer_id = self.prop_layer(e, cx);
-        let Some(layer) = self.d.layer(layer_id) else { return };
+        let Some(layer) = self.d.layer(layer_id) else {
+            return;
+        };
         if !layer.visible || layer.frozen || (self.opt.plot_only && !layer.plot) {
             return;
         }
@@ -171,16 +179,26 @@ impl Builder<'_> {
             LinetypeRef::ByBlock => cx.linetype,
             LinetypeRef::Id(id) => Some(id),
         };
-        let ltscale = self.d.tables.settings.ltscale.max(1e-12) * e.linetype_scale.max(1e-12) * cx.ltscale;
-        let dash =
-            linetype.and_then(|id| self.d.tables.linetypes.get(&id)).and_then(|lt| dash_array(&lt.pattern, ltscale));
-        let style = StrokeStyle { color, weight_mm, dash };
+        let ltscale =
+            self.d.tables.settings.ltscale.max(1e-12) * e.linetype_scale.max(1e-12) * cx.ltscale;
+        let dash = linetype
+            .and_then(|id| self.d.tables.linetypes.get(&id))
+            .and_then(|lt| dash_array(&lt.pattern, ltscale));
+        let style = StrokeStyle {
+            color,
+            weight_mm,
+            dash,
+        };
 
         match &e.kind {
             EntityKind::Point { p } => {
                 let p = cx.m.transform_point2(*p);
                 geom::bbox_add_point(&mut self.scene.bbox, p);
-                self.scene.items.push(Item::Point { p, color, weight_mm });
+                self.scene.items.push(Item::Point {
+                    p,
+                    color,
+                    weight_mm,
+                });
             }
             EntityKind::Text(t) => {
                 let item = self.text_item(
@@ -228,8 +246,13 @@ impl Builder<'_> {
                         &fallback
                     }
                 };
-                let Some(g) = dimgeom::build(dim, ds) else { return };
-                let solid = StrokeStyle { dash: None, ..style };
+                let Some(g) = dimgeom::build(dim, ds) else {
+                    return;
+                };
+                let solid = StrokeStyle {
+                    dash: None,
+                    ..style
+                };
                 let mut path = Vec::new();
                 for (a, b) in &g.lines {
                     path.push(Seg::Move(*a));
@@ -242,7 +265,12 @@ impl Builder<'_> {
                 if !g.arrows.is_empty() {
                     let mut fill = Vec::new();
                     for t in &g.arrows {
-                        fill.extend([Seg::Move(t[0]), Seg::Line(t[1]), Seg::Line(t[2]), Seg::Close]);
+                        fill.extend([
+                            Seg::Move(t[0]),
+                            Seg::Line(t[1]),
+                            Seg::Line(t[2]),
+                            Seg::Close,
+                        ]);
                     }
                     self.push_fill(fill, color, cx);
                 }
@@ -276,7 +304,10 @@ impl Builder<'_> {
                 } else {
                     let mut bb = None;
                     geom::path_bbox(&path, &mut bb);
-                    let tol = bb.map(|b: BBox2| (b.max - b.min).max_element() * 1e-4).unwrap_or(1e-3).max(1e-9);
+                    let tol = bb
+                        .map(|b: BBox2| (b.max - b.min).max_element() * 1e-4)
+                        .unwrap_or(1e-3)
+                        .max(1e-9);
                     let polys = geom::flatten(&path, tol);
                     let fams = pattern::families(
                         &pattern::lines_or_default(&h.pattern.name),
@@ -290,7 +321,14 @@ impl Builder<'_> {
                         lines.push(Seg::Line(b));
                     }
                     if !lines.is_empty() {
-                        self.push_stroke(lines, StrokeStyle { dash: None, ..style }, cx);
+                        self.push_stroke(
+                            lines,
+                            StrokeStyle {
+                                dash: None,
+                                ..style
+                            },
+                            cx,
+                        );
                     }
                 }
             }
@@ -298,9 +336,12 @@ impl Builder<'_> {
                 if cx.depth >= MAX_DEPTH {
                     return;
                 }
-                let Some(block) = self.d.blocks.get(&ins.block) else { return };
-                let local = DAffine2::from_scale_angle_translation(ins.scale, ins.rotation, ins.pos)
-                    * DAffine2::from_translation(-block.base);
+                let Some(block) = self.d.blocks.get(&ins.block) else {
+                    return;
+                };
+                let local =
+                    DAffine2::from_scale_angle_translation(ins.scale, ins.rotation, ins.pos)
+                        * DAffine2::from_translation(-block.base);
                 let det = (ins.scale.x * ins.scale.y).abs().sqrt();
                 let child = Ctx {
                     m: cx.m * local,
@@ -312,7 +353,12 @@ impl Builder<'_> {
                     },
                     linetype,
                     lineweight: weight,
-                    ltscale: cx.ltscale * if det.is_finite() && det > 0.0 { det } else { 1.0 },
+                    ltscale: cx.ltscale
+                        * if det.is_finite() && det > 0.0 {
+                            det
+                        } else {
+                            1.0
+                        },
                     depth: cx.depth + 1,
                 };
                 for be in block.entities.values() {
@@ -369,11 +415,19 @@ impl Builder<'_> {
         let y = m * wcad_math::perp(dir);
         let sx = x.length();
         let sy = y.length();
-        let (sx, sy) = if sx > 0.0 && sy > 0.0 && sx.is_finite() && sy.is_finite() { (sx, sy) } else { (1.0, 1.0) };
+        let (sx, sy) = if sx > 0.0 && sy > 0.0 && sx.is_finite() && sy.is_finite() {
+            (sx, sy)
+        } else {
+            (1.0, 1.0)
+        };
         // Style width factor / oblique apply when the entity leaves them at the default.
         let (wf, obl) = match style.and_then(|s| self.d.tables.text_styles.get(&s)) {
             Some(st) => (
-                if (width_factor - 1.0).abs() < 1e-12 { st.width_factor } else { width_factor },
+                if (width_factor - 1.0).abs() < 1e-12 {
+                    st.width_factor
+                } else {
+                    width_factor
+                },
                 if oblique == 0.0 { st.oblique } else { oblique },
             ),
             None => (width_factor, oblique),
@@ -383,11 +437,19 @@ impl Builder<'_> {
             pos: cx.m.transform_point2(pos),
             height: height * sy,
             rotation: x.y.atan2(x.x),
-            width_factor: if wf.is_finite() && wf > 0.0 { wf * sx / sy } else { sx / sy },
+            width_factor: if wf.is_finite() && wf > 0.0 {
+                wf * sx / sy
+            } else {
+                sx / sy
+            },
             oblique: if obl.is_finite() { obl } else { 0.0 },
             halign,
             valign,
-            line_spacing: if line_spacing.is_finite() && line_spacing > 0.0 { line_spacing } else { 1.0 },
+            line_spacing: if line_spacing.is_finite() && line_spacing > 0.0 {
+                line_spacing
+            } else {
+                1.0
+            },
             wrap_width: wrap_width.map(|w| w * sx),
             color,
             style,
@@ -400,8 +462,12 @@ impl Builder<'_> {
         }
         // Rough extent for the bounding box.
         let lines = wrap_lines(&t.text, t.height, t.width_factor, t.wrap_width);
-        let w = lines.iter().map(|l| estimate_width(l, t.height, t.width_factor)).fold(0.0, f64::max);
-        let h = t.height * (1.0 + LINE_PITCH * t.line_spacing * (lines.len().saturating_sub(1)) as f64);
+        let w = lines
+            .iter()
+            .map(|l| estimate_width(l, t.height, t.width_factor))
+            .fold(0.0, f64::max);
+        let h =
+            t.height * (1.0 + LINE_PITCH * t.line_spacing * (lines.len().saturating_sub(1)) as f64);
         let (ox, b0) = text_block_offset(t.halign, t.valign, w, h, t.height);
         let dir = DVec2::new(t.rotation.cos(), t.rotation.sin());
         let up = wcad_math::perp(dir);
@@ -420,7 +486,13 @@ pub(crate) const DESCENT: f64 = 0.3;
 /// For a text block of width `w` and height `h` (cap of the first line to the baseline of the
 /// last), returns the offset of the line start along the baseline and the offset of the first
 /// baseline perpendicular to it, relative to the alignment point.
-pub(crate) fn text_block_offset(halign: HAlign, valign: VAlign, w: f64, h: f64, cap: f64) -> (f64, f64) {
+pub(crate) fn text_block_offset(
+    halign: HAlign,
+    valign: VAlign,
+    w: f64,
+    h: f64,
+    cap: f64,
+) -> (f64, f64) {
     let ox = match halign {
         HAlign::Left => 0.0,
         HAlign::Center => -w * 0.5,
@@ -472,11 +544,17 @@ pub(crate) fn estimate_width(s: &str, height: f64, width_factor: f64) -> f64 {
 }
 
 /// Split into lines (explicit `\n`) and wrap to `wrap` using estimated widths.
-pub(crate) fn wrap_lines(text: &str, height: f64, width_factor: f64, wrap: Option<f64>) -> Vec<String> {
+pub(crate) fn wrap_lines(
+    text: &str,
+    height: f64,
+    width_factor: f64,
+    wrap: Option<f64>,
+) -> Vec<String> {
     let mut out = Vec::new();
     let em = (height / 0.72) * width_factor;
     for para in text.split('\n') {
-        let Some(w) = wrap.filter(|w| *w > 0.0 && w.is_finite() && em > 0.0 && em.is_finite()) else {
+        let Some(w) = wrap.filter(|w| *w > 0.0 && w.is_finite() && em > 0.0 && em.is_finite())
+        else {
             out.push(para.to_string());
             continue;
         };
@@ -556,7 +634,10 @@ mod tests {
         assert!((d[0] - 20.0).abs() < 1e-12 && (d[3] - 4.0).abs() < 1e-12);
         let lines = wrap_lines("aaaa bbbb cccc", 1.0, 1.0, Some(4.0));
         assert!(lines.len() >= 2, "{lines:?}");
-        assert_eq!(wrap_lines("中文\n第二行", 1.0, 1.0, None), vec!["中文".to_string(), "第二行".to_string()]);
+        assert_eq!(
+            wrap_lines("中文\n第二行", 1.0, 1.0, None),
+            vec!["中文".to_string(), "第二行".to_string()]
+        );
         assert_eq!(attachment_align(5), (HAlign::Center, VAlign::Middle));
         assert_eq!(attachment_align(7), (HAlign::Left, VAlign::Bottom));
     }

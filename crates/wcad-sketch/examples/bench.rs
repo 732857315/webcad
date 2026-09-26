@@ -9,7 +9,7 @@ use std::time::Instant;
 
 use bench_sketch::{build, max_point_dev, perturb};
 use wcad_math::DVec2;
-use wcad_sketch::{ConstraintKind as K, DimValue, Diagnosis, SolveReport};
+use wcad_sketch::{ConstraintKind as K, Diagnosis, DimValue, SolveReport};
 
 fn best_ms<F: FnMut()>(reps: usize, mut f: F) -> f64 {
     let mut best = f64::MAX;
@@ -22,11 +22,19 @@ fn best_ms<F: FnMut()>(reps: usize, mut f: F) -> f64 {
 }
 
 fn main() {
-    let n: usize = std::env::args().nth(1).and_then(|a| a.parse().ok()).unwrap_or(25);
+    let n: usize = std::env::args()
+        .nth(1)
+        .and_then(|a| a.parse().ok())
+        .unwrap_or(25);
     let b = build(n);
     let base = b.sk.clone();
     let d0 = base.diagnose();
-    println!("units={n} constraints={} equations={} params={}", base.constraints.len(), d0.n_equations, d0.n_params);
+    println!(
+        "units={n} constraints={} equations={} params={}",
+        base.constraints.len(),
+        d0.n_equations,
+        d0.n_params
+    );
     let mut rep = SolveReport::default();
     let mut dev = 0.0;
     let ms = best_ms(5, || {
@@ -41,7 +49,12 @@ fn main() {
     );
     let mut d = Diagnosis::default();
     let ms = best_ms(5, || d = base.diagnose());
-    println!("diagnose: {ms:.3} ms dof={} rank={} groups={}", d.dof, d.rank, d.groups.len());
+    println!(
+        "diagnose: {ms:.3} ms dof={} rank={} groups={}",
+        d.dof,
+        d.rank,
+        d.groups.len()
+    );
 
     let mut sk = base.clone();
     for &h in &b.heights {
@@ -66,10 +79,15 @@ fn main() {
     );
 
     let mut sk = base.clone();
-    let (Some((a, _)), Some((c, _))) = (sk.line_ends(b.first_line), sk.line_ends(b.third_line)) else {
+    let (Some((a, _)), Some((c, _))) = (sk.line_ends(b.first_line), sk.line_ends(b.third_line))
+    else {
         return;
     };
-    let bad = sk.add_constraint(K::Distance { p1: a, p2: c, value: DimValue::new(1.0) });
+    let bad = sk.add_constraint(K::Distance {
+        p1: a,
+        p2: c,
+        value: DimValue::new(1.0),
+    });
     let t = Instant::now();
     let rep = sk.solve();
     let ts = t.elapsed().as_secs_f64() * 1e3;

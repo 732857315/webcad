@@ -200,7 +200,9 @@ pub fn format_value(v: f64, decimals: u8) -> String {
 pub fn value_text(kind: &DimKind, style: &DimStyle) -> String {
     let v = measure(kind);
     let value = match kind {
-        DimKind::Angular { .. } => format!("{}°", format_value(v.to_degrees(), style.angle_decimals)),
+        DimKind::Angular { .. } => {
+            format!("{}°", format_value(v.to_degrees(), style.angle_decimals))
+        }
         DimKind::Radius { .. } => format!("R{}", format_value(v, style.decimals)),
         DimKind::Diameter { .. } => format!("Ø{}", format_value(v, style.decimals)),
         _ => format_value(v, style.decimals),
@@ -266,7 +268,11 @@ struct Sizes {
 }
 
 fn nonneg(v: f64, default: f64) -> f64 {
-    if v.is_finite() && v >= 0.0 { v } else { default }
+    if v.is_finite() && v >= 0.0 {
+        v
+    } else {
+        default
+    }
 }
 
 impl Sizes {
@@ -628,7 +634,8 @@ fn angular(
         let u = DVec2::from_angle(a);
         let dp = (p - v).dot(u);
         if dp < r - s.exo {
-            b.ext.push((v + u * (dp.max(0.0) + s.exo), at(a) + u * s.exe));
+            b.ext
+                .push((v + u * (dp.max(0.0) + s.exo), at(a) + u * s.exe));
         }
     }
     let arc_len = r * sweep;
@@ -777,19 +784,39 @@ mod tests {
         assert_eq!(g.text, "100.00");
         // Extension lines: from 0.625 above the points to 1.25 past the dimension line.
         assert!(has_line(&g, DVec2::new(0.0, 0.625), DVec2::new(0.0, 11.25)));
-        assert!(has_line(&g, DVec2::new(100.0, 0.625), DVec2::new(100.0, 11.25)));
+        assert!(has_line(
+            &g,
+            DVec2::new(100.0, 0.625),
+            DVec2::new(100.0, 11.25)
+        ));
         // Dimension line and inward-pointing closed arrows at both ends.
         assert!(has_line(&g, DVec2::new(0.0, 10.0), DVec2::new(100.0, 10.0)));
         assert_eq!(g.arrows.len(), 2);
         assert!(near(g.arrows[0][0], DVec2::new(0.0, 10.0)));
-        assert!(near(g.arrows[0][1], DVec2::new(2.5, 10.0 + 2.5 / 6.0)));
+        for y in [10.0 - 2.5 / 6.0, 10.0 + 2.5 / 6.0] {
+            assert!(
+                g.arrows[0][1..]
+                    .iter()
+                    .any(|p| near(*p, DVec2::new(2.5, y)))
+            );
+        }
+        let [tip, left, right] = g.arrows[0];
+        assert!((left - tip).perp_dot(right - tip) > 0.0);
         assert!(near(g.arrows[1][0], DVec2::new(100.0, 10.0)));
         assert!(g.arrows[1][1].x < 100.0);
         // Text above the line: centre at gap + h/2 = 0.625 + 1.25.
-        assert!(near(g.text_pos, DVec2::new(50.0, 11.875)), "{:?}", g.text_pos);
+        assert!(
+            near(g.text_pos, DVec2::new(50.0, 11.875)),
+            "{:?}",
+            g.text_pos
+        );
         assert_eq!(g.text_rotation, 0.0);
         assert_eq!((g.halign, g.valign), (HAlign::Center, VAlign::Middle));
-        assert!(g.text_width > 5.0 && g.text_width < 12.0, "{}", g.text_width);
+        assert!(
+            g.text_width > 5.0 && g.text_width < 12.0,
+            "{}",
+            g.text_width
+        );
         assert!(g.distance(DVec2::new(50.0, 10.0)) < 1e-9);
         assert!(g.distance(g.text_pos) == 0.0);
         let bb = g.bbox();
@@ -808,9 +835,17 @@ mod tests {
         assert!(has_line(&g, DVec2::new(20.0, 0.0), DVec2::new(20.0, 40.0)));
         // Extension lines run horizontally to x = 20 + 1.25.
         assert!(has_line(&g, DVec2::new(0.625, 0.0), DVec2::new(21.25, 0.0)));
-        assert!(has_line(&g, DVec2::new(3.625, 40.0), DVec2::new(21.25, 40.0)));
+        assert!(has_line(
+            &g,
+            DVec2::new(3.625, 40.0),
+            DVec2::new(21.25, 40.0)
+        ));
         assert!((g.text_rotation - FRAC_PI_2).abs() < 1e-12);
-        assert!(near(g.text_pos, DVec2::new(20.0 - 1.875, 20.0)), "{:?}", g.text_pos);
+        assert!(
+            near(g.text_pos, DVec2::new(20.0 - 1.875, 20.0)),
+            "{:?}",
+            g.text_pos
+        );
     }
 
     #[test]
@@ -822,7 +857,11 @@ mod tests {
         }));
         assert_eq!(g.text_rotation, 0.0);
         // "Above" in the reading frame (+Y), even though the line is below the points.
-        assert!(near(g.text_pos, DVec2::new(5.0, -5.0 + 1.875)), "{:?}", g.text_pos);
+        assert!(
+            near(g.text_pos, DVec2::new(5.0, -5.0 + 1.875)),
+            "{:?}",
+            g.text_pos
+        );
         let a = readable(170f64.to_radians());
         assert!((a + 10f64.to_radians()).abs() < 1e-12);
         assert!((readable(-FRAC_PI_2) - FRAC_PI_2).abs() < 1e-12);
@@ -867,8 +906,14 @@ mod tests {
             .filter(|(a, b)| (a.y - 10.0).abs() < 1e-9 && (b.y - 10.0).abs() < 1e-9)
             .collect();
         assert_eq!(on_line.len(), 2, "{on_line:?}");
-        let gap_lo = on_line.iter().map(|(a, b)| a.x.max(b.x)).fold(f64::MAX, f64::min);
-        let gap_hi = on_line.iter().map(|(a, b)| a.x.min(b.x)).fold(f64::MIN, f64::max);
+        let gap_lo = on_line
+            .iter()
+            .map(|(a, b)| a.x.max(b.x))
+            .fold(f64::MAX, f64::min);
+        let gap_hi = on_line
+            .iter()
+            .map(|(a, b)| a.x.min(b.x))
+            .fold(f64::MIN, f64::max);
         assert!((gap_hi - gap_lo - (g.text_width + 2.0 * 0.625)).abs() < 1e-6);
     }
 
@@ -889,7 +934,11 @@ mod tests {
         assert_eq!(dim_text(&d, &st), "L=~12.3 mm (ref)");
         d.text_override = Some(" ".into());
         assert_eq!(dim_text(&d, &st), "");
-        assert!(dimension_geometry(&d, &st, &doc.drawing.tables).text.is_empty());
+        assert!(
+            dimension_geometry(&d, &st, &doc.drawing.tables)
+                .text
+                .is_empty()
+        );
         d.text_override = Some(String::new());
         assert_eq!(dim_text(&d, &st), "~12.3 mm");
         assert_eq!(format_value(-0.0001, 2), "0.00");
@@ -907,7 +956,11 @@ mod tests {
         assert!(has_line(&g, DVec2::ZERO, DVec2::new(20.0, 0.0)));
         assert!(near(g.arrows[0][0], DVec2::new(20.0, 0.0)));
         assert!(g.arrows[0][1].x < 20.0, "arrow points outward from inside");
-        assert!(near(g.text_pos, DVec2::new(8.75, 1.875)), "{:?}", g.text_pos);
+        assert!(
+            near(g.text_pos, DVec2::new(8.75, 1.875)),
+            "{:?}",
+            g.text_pos
+        );
 
         let g = geom(&dim(DimKind::Diameter {
             center: DVec2::new(5.0, 5.0),
@@ -917,7 +970,11 @@ mod tests {
         assert!(has_line(&g, DVec2::new(5.0, -15.0), DVec2::new(5.0, 25.0)));
         assert_eq!(g.arrows.len(), 2);
         assert!((g.text_rotation - FRAC_PI_2).abs() < 1e-12);
-        assert!(near(g.text_pos, DVec2::new(5.0 - 1.875, 5.0)), "{:?}", g.text_pos);
+        assert!(
+            near(g.text_pos, DVec2::new(5.0 - 1.875, 5.0)),
+            "{:?}",
+            g.text_pos
+        );
 
         // User text outside: leader re-aimed through the centre, arrow on the circle pointing in.
         let mut d = dim(DimKind::Radius {
@@ -952,12 +1009,23 @@ mod tests {
         assert!((g.arcs[0].r - r).abs() < 1e-9);
         assert!((g.arcs[0].sweep() - FRAC_PI_2).abs() < 1e-9);
         // Extension lines from beyond the defining points out past the arc.
-        assert!(has_line(&g, DVec2::new(10.625, 0.0), DVec2::new(r + 1.25, 0.0)));
-        assert!(has_line(&g, DVec2::new(0.0, 10.625), DVec2::new(0.0, r + 1.25)));
+        assert!(has_line(
+            &g,
+            DVec2::new(10.625, 0.0),
+            DVec2::new(r + 1.25, 0.0)
+        ));
+        assert!(has_line(
+            &g,
+            DVec2::new(0.0, 10.625),
+            DVec2::new(0.0, r + 1.25)
+        ));
         assert!(near(g.arrows[0][0], DVec2::new(r, 0.0)));
         assert!(g.arrows[0][1].y > 0.0, "arrow body inside the arc");
         let mid = DVec2::from_angle(PI / 4.0);
-        assert!(near(g.text_pos, mid * r + DVec2::from_angle(PI / 4.0) * 1.875));
+        assert!(near(
+            g.text_pos,
+            mid * r + DVec2::from_angle(PI / 4.0) * 1.875
+        ));
         assert!((g.text_rotation + PI / 4.0).abs() < 1e-9);
         // Arc inside the lines: no extension lines.
         let g = geom(&dim(DimKind::Angular {
@@ -978,9 +1046,16 @@ mod tests {
             x_axis: true,
         }));
         assert_eq!(g.text, "30.00");
-        assert!(has_line(&g, DVec2::new(30.0, 10.625), DVec2::new(30.0, 40.0)));
+        assert!(has_line(
+            &g,
+            DVec2::new(30.0, 10.625),
+            DVec2::new(30.0, 40.0)
+        ));
         assert!((g.text_rotation - FRAC_PI_2).abs() < 1e-12);
-        assert!(near(g.text_pos, DVec2::new(30.0, 40.625 + g.text_width * 0.5)));
+        assert!(near(
+            g.text_pos,
+            DVec2::new(30.0, 40.625 + g.text_width * 0.5)
+        ));
         // Jogged leader.
         let g = geom(&dim(DimKind::Ordinate {
             origin: DVec2::ZERO,
@@ -1003,12 +1078,37 @@ mod tests {
         st.decimals = 255;
         let n = f64::NAN;
         for kind in [
-            DimKind::Linear { p1: DVec2::ZERO, p2: DVec2::ZERO, line_point: DVec2::ZERO, rotation: n },
-            DimKind::Aligned { p1: DVec2::splat(n), p2: DVec2::ONE, line_point: DVec2::ZERO },
-            DimKind::Radius { center: DVec2::ZERO, point: DVec2::ZERO },
-            DimKind::Diameter { center: DVec2::ONE, point: DVec2::splat(f64::INFINITY) },
-            DimKind::Angular { vertex: DVec2::ZERO, p1: DVec2::ZERO, p2: DVec2::ZERO, arc_point: DVec2::ZERO },
-            DimKind::Ordinate { origin: DVec2::ZERO, point: DVec2::ZERO, leader_end: DVec2::ZERO, x_axis: true },
+            DimKind::Linear {
+                p1: DVec2::ZERO,
+                p2: DVec2::ZERO,
+                line_point: DVec2::ZERO,
+                rotation: n,
+            },
+            DimKind::Aligned {
+                p1: DVec2::splat(n),
+                p2: DVec2::ONE,
+                line_point: DVec2::ZERO,
+            },
+            DimKind::Radius {
+                center: DVec2::ZERO,
+                point: DVec2::ZERO,
+            },
+            DimKind::Diameter {
+                center: DVec2::ONE,
+                point: DVec2::splat(f64::INFINITY),
+            },
+            DimKind::Angular {
+                vertex: DVec2::ZERO,
+                p1: DVec2::ZERO,
+                p2: DVec2::ZERO,
+                arc_point: DVec2::ZERO,
+            },
+            DimKind::Ordinate {
+                origin: DVec2::ZERO,
+                point: DVec2::ZERO,
+                leader_end: DVec2::ZERO,
+                x_axis: true,
+            },
         ] {
             let mut d = dim(kind);
             let g = dimension_geometry(&d, &st, &doc.drawing.tables);

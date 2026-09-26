@@ -41,7 +41,13 @@ pub struct SolveOptions {
 
 impl Default for SolveOptions {
     fn default() -> Self {
-        SolveOptions { tol: 1e-10, max_iter: 100, drag_weight: 1e6, pivot_tol: 1e-10, keep_arc_orientation: true }
+        SolveOptions {
+            tol: 1e-10,
+            max_iter: 100,
+            drag_weight: 1e6,
+            pivot_tol: 1e-10,
+            keep_arc_orientation: true,
+        }
     }
 }
 
@@ -119,12 +125,20 @@ pub struct Diagnosis {
 impl Diagnosis {
     /// Members of each conflicting group.
     pub fn conflict_groups(&self) -> Vec<Vec<SkConstraintId>> {
-        self.groups.iter().filter(|g| g.conflicting).map(|g| g.members.clone()).collect()
+        self.groups
+            .iter()
+            .filter(|g| g.conflicting)
+            .map(|g| g.members.clone())
+            .collect()
     }
 
     /// Members of each redundant (consistent) group.
     pub fn redundant_groups(&self) -> Vec<Vec<SkConstraintId>> {
-        self.groups.iter().filter(|g| !g.conflicting).map(|g| g.members.clone()).collect()
+        self.groups
+            .iter()
+            .filter(|g| !g.conflicting)
+            .map(|g| g.members.clone())
+            .collect()
     }
 
     pub fn status(&self, id: SkEntityId) -> Option<EntityStatus> {
@@ -137,7 +151,9 @@ impl Diagnosis {
 
     /// A point with at least one free coordinate.
     pub fn is_point_free(&self, id: SkEntityId) -> bool {
-        self.free_params.iter().any(|p| matches!(*p, Param::X(e) | Param::Y(e) if e == id))
+        self.free_params
+            .iter()
+            .any(|p| matches!(*p, Param::X(e) | Param::Y(e) if e == id))
     }
 
     /// Fully constrained, no conflicts, no redundancy.
@@ -150,7 +166,11 @@ impl Diagnosis {
 fn run(sys: &mut System, opt: &SolveOptions, weights: &[(u32, f64)], only: &[u32]) -> SolveReport {
     let (cls, constant) = clusters(sys);
     let mut w = Work::new(sys.x.len());
-    let mut rep = SolveReport { converged: true, invalid: sys.invalid.clone(), ..Default::default() };
+    let mut rep = SolveReport {
+        converged: true,
+        invalid: sys.invalid.clone(),
+        ..Default::default()
+    };
     let mut weight = vec![1.0; sys.x.len()];
     for &(p, v) in weights {
         if let Some(slot) = weight.get_mut(p as usize) {
@@ -172,7 +192,12 @@ fn run(sys: &mut System, opt: &SolveOptions, weights: &[(u32, f64)], only: &[u32
             arcs.extend(
                 sys.arcs
                     .iter()
-                    .filter(|(_, pts)| pts.iter().any(|p| cl.params.binary_search(&p.x).is_ok() || cl.params.binary_search(&p.y).is_ok()))
+                    .filter(|(_, pts)| {
+                        pts.iter().any(|p| {
+                            cl.params.binary_search(&p.x).is_ok()
+                                || cl.params.binary_search(&p.y).is_ok()
+                        })
+                    })
                     .map(|(_, pts)| *pts),
             );
         }
@@ -232,7 +257,6 @@ fn run(sys: &mut System, opt: &SolveOptions, weights: &[(u32, f64)], only: &[u32
     rep
 }
 
-
 impl Sketch {
     /// Solve all enforced constraints from the current state and write the result back.
     pub fn solve(&mut self) -> SolveReport {
@@ -254,11 +278,18 @@ impl Sketch {
         self.drag_with(point, target, &SolveOptions::default())
     }
 
-    pub fn drag_with(&mut self, point: SkEntityId, target: DVec2, opt: &SolveOptions) -> SolveReport {
+    pub fn drag_with(
+        &mut self,
+        point: SkEntityId,
+        target: DVec2,
+        opt: &SolveOptions,
+    ) -> SolveReport {
         if !target.is_finite() {
             return SolveReport::default();
         }
-        let Some(p) = self.point(point) else { return SolveReport::default() };
+        let Some(p) = self.point(point) else {
+            return SolveReport::default();
+        };
         self.move_points(&[point], target - p, &[], opt)
     }
 
@@ -268,11 +299,18 @@ impl Sketch {
         self.drag_curve_with(entity, delta, &SolveOptions::default())
     }
 
-    pub fn drag_curve_with(&mut self, entity: SkEntityId, delta: DVec2, opt: &SolveOptions) -> SolveReport {
+    pub fn drag_curve_with(
+        &mut self,
+        entity: SkEntityId,
+        delta: DVec2,
+        opt: &SolveOptions,
+    ) -> SolveReport {
         if !delta.is_finite() {
             return SolveReport::default();
         }
-        let Some(e) = self.entities.get(&entity) else { return SolveReport::default() };
+        let Some(e) = self.entities.get(&entity) else {
+            return SolveReport::default();
+        };
         let mut pts = e.geom.defining_points();
         let mut radius = Vec::new();
         match e.geom {
@@ -283,12 +321,20 @@ impl Sketch {
         self.move_points(&pts, delta, &radius, opt)
     }
 
-    fn move_points(&mut self, pts: &[SkEntityId], delta: DVec2, weighted_radii: &[SkEntityId], opt: &SolveOptions) -> SolveReport {
+    fn move_points(
+        &mut self,
+        pts: &[SkEntityId],
+        delta: DVec2,
+        weighted_radii: &[SkEntityId],
+        opt: &SolveOptions,
+    ) -> SolveReport {
         // Orientation choices (tangent sides, ...) come from the state before the move.
         let mut sys = System::build(self);
         let mut weights = Vec::new();
         for id in pts {
-            let Some(&pt) = sys.points.get(id) else { continue };
+            let Some(&pt) = sys.points.get(id) else {
+                continue;
+            };
             if sys.locked[pt.x as usize] {
                 continue;
             }
@@ -302,7 +348,11 @@ impl Sketch {
         }
         if weights.is_empty() {
             // Nothing movable (fixed or unknown): report the current state of the sketch.
-            return SolveReport { converged: true, invalid: sys.invalid.clone(), ..Default::default() };
+            return SolveReport {
+                converged: true,
+                invalid: sys.invalid.clone(),
+                ..Default::default()
+            };
         }
         for id in weighted_radii {
             if let Some(&r) = sys.radii.get(id) {
@@ -331,7 +381,10 @@ impl Sketch {
     /// to line 2 in `(-π, π]`. `NaN` for unknown ids, non-dimensional constraints or broken
     /// references.
     pub fn measure(&self, id: SkConstraintId) -> f64 {
-        self.constraints.get(&id).and_then(|c| self.measure_kind(&c.kind)).unwrap_or(f64::NAN)
+        self.constraints
+            .get(&id)
+            .and_then(|c| self.measure_kind(&c.kind))
+            .unwrap_or(f64::NAN)
     }
 
     /// Like [`Sketch::measure`] for a constraint that is not (yet) in the sketch.

@@ -13,8 +13,8 @@
 
 use std::collections::BTreeMap;
 
-use super::lm::{Jac, clusters, scale_of};
 use super::linalg::Skyline;
+use super::lm::{Jac, clusters, scale_of};
 use super::system::{Owner, ParamOf, System};
 use super::{DependencyGroup, Diagnosis, EntityStatus, Param, SolveOptions};
 use crate::model::{SkConstraintId, Sketch};
@@ -42,14 +42,24 @@ fn push_group(groups: &mut Vec<DependencyGroup>, g: DependencyGroup) {
 
 /// Build a group from its owners; the dependent constraint is `dependent`'s constraint or, for an
 /// arc-internal row, the most recent member.
-fn make_group(dependent: Owner, mut members: Vec<SkConstraintId>, conflicting: bool, inconsistency: f64) -> Option<DependencyGroup> {
+fn make_group(
+    dependent: Owner,
+    mut members: Vec<SkConstraintId>,
+    conflicting: bool,
+    inconsistency: f64,
+) -> Option<DependencyGroup> {
     if let Some(c) = dependent.constraint() {
         members.push(c);
     }
     members.sort_unstable();
     members.dedup();
     let constraint = dependent.constraint().or_else(|| members.last().copied())?;
-    Some(DependencyGroup { constraint, members, conflicting, inconsistency })
+    Some(DependencyGroup {
+        constraint,
+        members,
+        conflicting,
+        inconsistency,
+    })
 }
 
 pub(crate) fn diagnose(sk: &Sketch, sys: &System, opt: &SolveOptions) -> Diagnosis {
@@ -71,7 +81,10 @@ pub(crate) fn diagnose(sk: &Sketch, sys: &System, opt: &SolveOptions) -> Diagnos
         let f = e.eval(&sys.x, &mut grad);
         let params: Vec<u32> = grad.iter().map(|g| g.0).collect();
         let tol = conflict_tol(opt) * scale_of(&sys.x, &params);
-        let members: Vec<SkConstraintId> = params.iter().filter_map(|&p| sys.fix_of[p as usize]).collect();
+        let members: Vec<SkConstraintId> = params
+            .iter()
+            .filter_map(|&p| sys.fix_of[p as usize])
+            .collect();
         if let Some(g) = make_group(e.owner, members, f.abs() > tol || !f.is_finite(), f) {
             push_group(&mut d.groups, g);
         }
@@ -79,7 +92,12 @@ pub(crate) fn diagnose(sk: &Sketch, sys: &System, opt: &SolveOptions) -> Diagnos
     for &(dup, orig) in &sys.duplicate_fixes {
         push_group(
             &mut d.groups,
-            DependencyGroup { constraint: dup, members: vec![orig.min(dup), orig.max(dup)], conflicting: false, inconsistency: 0.0 },
+            DependencyGroup {
+                constraint: dup,
+                members: vec![orig.min(dup), orig.max(dup)],
+                conflicting: false,
+                inconsistency: 0.0,
+            },
         );
     }
 
@@ -108,7 +126,9 @@ pub(crate) fn diagnose(sk: &Sketch, sys: &System, opt: &SolveOptions) -> Diagnos
             if !(nr > 1e-300) || !nr.is_finite() {
                 dep[i] = true;
                 let fi = jac.f[i];
-                if let Some(gr) = make_group(owner, Vec::new(), fi.abs() > ctol || !fi.is_finite(), fi) {
+                if let Some(gr) =
+                    make_group(owner, Vec::new(), fi.abs() > ctol || !fi.is_finite(), fi)
+                {
                     push_group(&mut d.groups, gr);
                 }
                 jac.rv[r].iter_mut().for_each(|v| *v = 0.0);
@@ -132,7 +152,11 @@ pub(crate) fn diagnose(sk: &Sketch, sys: &System, opt: &SolveOptions) -> Diagnos
         for c in 0..n {
             for a in jac.cp[c]..jac.cp[c + 1] {
                 for b in jac.cp[c]..=a {
-                    g.add(jac.ci[a] as usize, jac.ci[b] as usize, jac.cv[a] * jac.cv[b]);
+                    g.add(
+                        jac.ci[a] as usize,
+                        jac.ci[b] as usize,
+                        jac.cv[a] * jac.cv[b],
+                    );
                 }
             }
         }
@@ -206,7 +230,12 @@ pub(crate) fn diagnose(sk: &Sketch, sys: &System, opt: &SolveOptions) -> Diagnos
             let (s, e) = (g.start[i], g.start[i + 1]);
             g.a[s..e].iter_mut().for_each(|v| *v = 0.0);
             let owner = sys.eqs[cl.eqs[i] as usize].owner;
-            if let Some(gr) = make_group(owner, members, incons.abs() > ctol || !incons.is_finite(), incons) {
+            if let Some(gr) = make_group(
+                owner,
+                members,
+                incons.abs() > ctol || !incons.is_finite(),
+                incons,
+            ) {
                 push_group(&mut d.groups, gr);
             }
         }
@@ -234,7 +263,12 @@ pub(crate) fn diagnose(sk: &Sketch, sys: &System, opt: &SolveOptions) -> Diagnos
                 if let Some(&last) = members.last() {
                     push_group(
                         &mut d.groups,
-                        DependencyGroup { constraint: last, members, conflicting: true, inconsistency: worst },
+                        DependencyGroup {
+                            constraint: last,
+                            members,
+                            conflicting: true,
+                            inconsistency: worst,
+                        },
                     );
                 }
             }
@@ -249,7 +283,9 @@ pub(crate) fn diagnose(sk: &Sketch, sys: &System, opt: &SolveOptions) -> Diagnos
             let y = &mut rhs;
             for (j, &p) in cl.params.iter().enumerate() {
                 let (c0, c1) = (jac.cp[j], jac.cp[j + 1]);
-                let Some(&r0) = jac.ci[c0..c1].first() else { continue };
+                let Some(&r0) = jac.ci[c0..c1].first() else {
+                    continue;
+                };
                 for e in c0..c1 {
                     y[jac.ci[e] as usize] = jac.cv[e];
                 }
@@ -285,7 +321,10 @@ pub(crate) fn diagnose(sk: &Sketch, sys: &System, opt: &SolveOptions) -> Diagnos
         }
     }
     d.dof = d.n_params.saturating_sub(d.rank);
-    d.free_params = (0..n_all).filter(|&p| !determined[p]).map(|p| param_public(sys.param_of[p])).collect();
+    d.free_params = (0..n_all)
+        .filter(|&p| !determined[p])
+        .map(|p| param_public(sys.param_of[p]))
+        .collect();
     for gr in &d.groups {
         if gr.conflicting {
             d.conflicting.extend(&gr.members);
@@ -294,7 +333,11 @@ pub(crate) fn diagnose(sk: &Sketch, sys: &System, opt: &SolveOptions) -> Diagnos
             d.redundant.push(gr.constraint);
         }
     }
-    for v in [&mut d.conflicting, &mut d.redundant, &mut d.conflicting_dependents] {
+    for v in [
+        &mut d.conflicting,
+        &mut d.redundant,
+        &mut d.conflicting_dependents,
+    ] {
         v.sort_unstable();
         v.dedup();
     }

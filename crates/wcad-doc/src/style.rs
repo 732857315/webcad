@@ -5,20 +5,15 @@ use serde::{Deserialize, Serialize};
 use crate::ids::{LinetypeId, TextStyleId};
 
 /// Entity color. Layer colors are never `ByLayer`/`ByBlock`.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(tag = "type", content = "v")]
 pub enum Color {
+    #[default]
     ByLayer,
     ByBlock,
     /// AutoCAD Color Index 1..=255 (7 = white/black depending on background).
     Aci(u8),
     Rgb(u8, u8, u8),
-}
-
-impl Default for Color {
-    fn default() -> Self {
-        Color::ByLayer
-    }
 }
 
 impl Color {
@@ -69,7 +64,11 @@ pub struct Linetype {
 
 impl Linetype {
     pub fn continuous() -> Self {
-        Self { name: "Continuous".into(), description: "Solid line".into(), pattern: vec![] }
+        Self {
+            name: "Continuous".into(),
+            description: "Solid line".into(),
+            pattern: vec![],
+        }
     }
     pub fn is_continuous(&self) -> bool {
         self.pattern.is_empty()

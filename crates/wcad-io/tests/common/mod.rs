@@ -46,10 +46,24 @@ pub fn sample() -> Sample {
         t.settings.ltscale = 2.5;
         t.linetypes.insert(
             lt_id,
-            Linetype { name: "MYDASH".into(), description: "my dash".into(), pattern: vec![5.0, -2.5, 0.0, -2.5] },
+            Linetype {
+                name: "MYDASH".into(),
+                description: "my dash".into(),
+                pattern: vec![5.0, -2.5, 0.0, -2.5],
+            },
         );
-        let dashed = t.linetypes.iter().find(|(_, l)| l.name == "DASHED").map(|(id, _)| *id).expect("DASHED");
-        let continuous = t.linetypes.iter().find(|(_, l)| l.name == "Continuous").map(|(id, _)| *id).expect("cont");
+        let dashed = t
+            .linetypes
+            .iter()
+            .find(|(_, l)| l.name == "DASHED")
+            .map(|(id, _)| *id)
+            .expect("DASHED");
+        let continuous = t
+            .linetypes
+            .iter()
+            .find(|(_, l)| l.name == "Continuous")
+            .map(|(id, _)| *id)
+            .expect("cont");
         let mk = |name: &str, color: Color, lt: LinetypeId, lw: LineWeight| Layer {
             name: name.into(),
             color,
@@ -60,13 +74,42 @@ pub fn sample() -> Sample {
             locked: false,
             plot: true,
         };
-        t.layers.insert(geom, mk("GEOM", Color::Aci(1), dashed, LineWeight::Mm100(35)));
-        t.layers.insert(off, Layer { visible: false, ..mk("OFF", Color::Aci(3), continuous, LineWeight::Default) });
-        t.layers.insert(frozen, Layer { frozen: true, ..mk("FROZEN", Color::Aci(4), continuous, LineWeight::Default) });
-        t.layers.insert(locked, Layer { locked: true, ..mk("LOCKED", Color::Aci(5), continuous, LineWeight::Default) });
+        t.layers.insert(
+            geom,
+            mk("GEOM", Color::Aci(1), dashed, LineWeight::Mm100(35)),
+        );
+        t.layers.insert(
+            off,
+            Layer {
+                visible: false,
+                ..mk("OFF", Color::Aci(3), continuous, LineWeight::Default)
+            },
+        );
+        t.layers.insert(
+            frozen,
+            Layer {
+                frozen: true,
+                ..mk("FROZEN", Color::Aci(4), continuous, LineWeight::Default)
+            },
+        );
+        t.layers.insert(
+            locked,
+            Layer {
+                locked: true,
+                ..mk("LOCKED", Color::Aci(5), continuous, LineWeight::Default)
+            },
+        );
         t.layers.insert(
             noplot,
-            Layer { plot: false, ..mk("不打印", Color::Rgb(10, 200, 30), continuous, LineWeight::Mm100(50)) },
+            Layer {
+                plot: false,
+                ..mk(
+                    "不打印",
+                    Color::Rgb(10, 200, 30),
+                    continuous,
+                    LineWeight::Mm100(50),
+                )
+            },
         );
         t.text_styles.insert(
             cjk,
@@ -101,17 +144,33 @@ pub fn sample() -> Sample {
         // Block with a non-zero base point.
         let mut bents = std::collections::BTreeMap::new();
         let c_id = tx.ids().entity();
-        bents.insert(c_id, Entity { id: c_id, ..ent(layer0, EntityKind::Circle(Circle2::new(v(5.0, 5.0), 2.0))) });
+        bents.insert(
+            c_id,
+            Entity {
+                id: c_id,
+                ..ent(layer0, EntityKind::Circle(Circle2::new(v(5.0, 5.0), 2.0)))
+            },
+        );
         let l_id = tx.ids().entity();
         bents.insert(
             l_id,
             Entity {
                 id: l_id,
                 color: Color::ByBlock,
-                ..ent(layer0, EntityKind::Line(Line2::new(v(3.0, 5.0), v(7.0, 5.0))))
+                ..ent(
+                    layer0,
+                    EntityKind::Line(Line2::new(v(3.0, 5.0), v(7.0, 5.0))),
+                )
             },
         );
-        tx.blocks_mut().insert(bolt, Block { name: "BOLT".into(), base: v(5.0, 5.0), entities: bents });
+        tx.blocks_mut().insert(
+            bolt,
+            Block {
+                name: "BOLT".into(),
+                base: v(5.0, 5.0),
+                entities: bents,
+            },
+        );
 
         let kinds: Vec<Entity> = vec![
             ent(layer0, EntityKind::Point { p: v(1.0, 2.0) }),
@@ -120,7 +179,10 @@ pub fn sample() -> Sample {
                 linetype: LinetypeRef::Id(lt_id),
                 linetype_scale: 2.0,
                 lineweight: LineWeight::Mm100(50),
-                ..ent(geom, EntityKind::Line(Line2::new(v(0.0, 0.0), v(100.0, 50.0))))
+                ..ent(
+                    geom,
+                    EntityKind::Line(Line2::new(v(0.0, 0.0), v(100.0, 50.0))),
+                )
             },
             Entity {
                 color: Color::Rgb(0x12, 0x34, 0x56),
@@ -130,9 +192,15 @@ pub fn sample() -> Sample {
                 color: Color::ByBlock,
                 linetype: LinetypeRef::ByBlock,
                 lineweight: LineWeight::ByBlock,
-                ..ent(layer0, EntityKind::Arc(Arc2::new(v(10.0, 10.0), 5.0, 0.3, 2.5)))
+                ..ent(
+                    layer0,
+                    EntityKind::Arc(Arc2::new(v(10.0, 10.0), 5.0, 0.3, 2.5)),
+                )
             },
-            ent(layer0, EntityKind::Arc(Arc2::new(v(-10.0, 10.0), 3.0, 5.5, 1.0))),
+            ent(
+                layer0,
+                EntityKind::Arc(Arc2::new(v(-10.0, 10.0), 3.0, 5.5, 1.0)),
+            ),
             ent(
                 layer0,
                 EntityKind::Ellipse(EllipseArc2 {
@@ -167,13 +235,23 @@ pub fn sample() -> Sample {
             ),
             ent(
                 layer0,
-                EntityKind::Polyline(Polyline2::from_points([v(0.0, -5.0), v(5.0, -7.0), v(9.0, -5.0)], false)),
+                EntityKind::Polyline(Polyline2::from_points(
+                    [v(0.0, -5.0), v(5.0, -7.0), v(9.0, -5.0)],
+                    false,
+                )),
             ),
             ent(
                 frozen,
                 EntityKind::Spline(Nurbs2 {
                     degree: 3,
-                    ctrl: vec![v(0.0, 20.0), v(5.0, 25.0), v(10.0, 15.0), v(15.0, 20.0), v(20.0, 22.0), v(25.0, 18.0)],
+                    ctrl: vec![
+                        v(0.0, 20.0),
+                        v(5.0, 25.0),
+                        v(10.0, 15.0),
+                        v(15.0, 20.0),
+                        v(20.0, 22.0),
+                        v(25.0, 18.0),
+                    ],
                     weights: vec![],
                     knots: vec![0.0, 0.0, 0.0, 0.0, 1.0, 2.0, 3.0, 3.0, 3.0, 3.0],
                     fit_points: vec![],
@@ -235,20 +313,57 @@ pub fn sample() -> Sample {
             dim(
                 layer0,
                 iso,
-                DimKind::Linear { p1: v(0.0, 0.0), p2: v(40.0, 10.0), line_point: v(20.0, 30.0), rotation: 0.0 },
+                DimKind::Linear {
+                    p1: v(0.0, 0.0),
+                    p2: v(40.0, 10.0),
+                    line_point: v(20.0, 30.0),
+                    rotation: 0.0,
+                },
             ),
             dim(
                 layer0,
                 iso,
-                DimKind::Linear { p1: v(0.0, 0.0), p2: v(40.0, 10.0), line_point: v(60.0, 5.0), rotation: FRAC_PI_2 },
+                DimKind::Linear {
+                    p1: v(0.0, 0.0),
+                    p2: v(40.0, 10.0),
+                    line_point: v(60.0, 5.0),
+                    rotation: FRAC_PI_2,
+                },
             ),
-            dim(layer0, iso, DimKind::Aligned { p1: v(0.0, 0.0), p2: v(30.0, 40.0), line_point: v(-10.0, 30.0) }),
-            dim(layer0, iso, DimKind::Radius { center: v(50.0, 50.0), point: v(67.67766952966369, 67.67766952966369) }),
-            dim(layer0, iso, DimKind::Diameter { center: v(50.0, 50.0), point: v(75.0, 50.0) }),
             dim(
                 layer0,
                 iso,
-                DimKind::Angular { vertex: v(0.0, 0.0), p1: v(20.0, 0.0), p2: v(10.0, 10.0), arc_point: v(15.0, 5.0) },
+                DimKind::Aligned {
+                    p1: v(0.0, 0.0),
+                    p2: v(30.0, 40.0),
+                    line_point: v(-10.0, 30.0),
+                },
+            ),
+            dim(
+                layer0,
+                iso,
+                DimKind::Radius {
+                    center: v(50.0, 50.0),
+                    point: v(67.67766952966369, 67.67766952966369),
+                },
+            ),
+            dim(
+                layer0,
+                iso,
+                DimKind::Diameter {
+                    center: v(50.0, 50.0),
+                    point: v(75.0, 50.0),
+                },
+            ),
+            dim(
+                layer0,
+                iso,
+                DimKind::Angular {
+                    vertex: v(0.0, 0.0),
+                    p1: v(20.0, 0.0),
+                    p2: v(10.0, 10.0),
+                    arc_point: v(15.0, 5.0),
+                },
             ),
             dim(
                 layer0,
@@ -274,7 +389,11 @@ pub fn sample() -> Sample {
                 let mut e = dim(
                     layer0,
                     iso,
-                    DimKind::Aligned { p1: v(0.0, -40.0), p2: v(20.0, -40.0), line_point: v(10.0, -45.0) },
+                    DimKind::Aligned {
+                        p1: v(0.0, -40.0),
+                        p2: v(20.0, -40.0),
+                        line_point: v(10.0, -45.0),
+                    },
                 );
                 if let EntityKind::Dimension(d) = &mut e.kind {
                     d.text_override = Some("L=<>".into());
@@ -297,9 +416,15 @@ pub fn sample() -> Sample {
                                 closed: true,
                             })],
                         },
-                        HatchLoop { curves: vec![Curve2::Circle(Circle2::new(v(40.0, 40.0), 3.0))] },
+                        HatchLoop {
+                            curves: vec![Curve2::Circle(Circle2::new(v(40.0, 40.0), 3.0))],
+                        },
                     ],
-                    pattern: HatchPatternRef { name: "SOLID".into(), angle: 0.0, scale: 1.0 },
+                    pattern: HatchPatternRef {
+                        name: "SOLID".into(),
+                        angle: 0.0,
+                        scale: 1.0,
+                    },
                 }),
             ),
             ent(
@@ -319,7 +444,12 @@ pub fn sample() -> Sample {
                             }),
                             Curve2::Spline(Nurbs2 {
                                 degree: 3,
-                                ctrl: vec![v(60.0, 20.0), v(58.0, 13.0), v(62.0, 7.0), v(60.0, 0.0)],
+                                ctrl: vec![
+                                    v(60.0, 20.0),
+                                    v(58.0, 13.0),
+                                    v(62.0, 7.0),
+                                    v(60.0, 0.0),
+                                ],
                                 weights: vec![],
                                 knots: vec![0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0],
                                 fit_points: vec![],
@@ -327,14 +457,23 @@ pub fn sample() -> Sample {
                             }),
                         ],
                     }],
-                    pattern: HatchPatternRef { name: "ANSI31".into(), angle: 0.5, scale: 2.0 },
+                    pattern: HatchPatternRef {
+                        name: "ANSI31".into(),
+                        angle: 0.5,
+                        scale: 2.0,
+                    },
                 }),
             ),
             Entity {
                 color: Color::Aci(6),
                 ..ent(
                     geom,
-                    EntityKind::Insert(Insert { block: bolt, pos: v(100.0, 100.0), scale: v(2.0, 1.5), rotation: 0.3 }),
+                    EntityKind::Insert(Insert {
+                        block: bolt,
+                        pos: v(100.0, 100.0),
+                        scale: v(2.0, 1.5),
+                        rotation: 0.3,
+                    }),
                 )
             },
         ];
@@ -346,5 +485,13 @@ pub fn sample() -> Sample {
 }
 
 fn dim(layer: LayerId, style: DimStyleId, kind: DimKind) -> Entity {
-    ent(layer, EntityKind::Dimension(Dimension { kind, style, text_override: None, text_pos: None }))
+    ent(
+        layer,
+        EntityKind::Dimension(Dimension {
+            kind,
+            style,
+            text_override: None,
+            text_pos: None,
+        }),
+    )
 }

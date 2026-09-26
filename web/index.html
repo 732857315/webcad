@@ -83,8 +83,10 @@
     if ({{SERVICE_WORKER}}) {
       navigator.serviceWorker.register("./sw.js", { scope: "./" }).catch((e) => console.warn("service worker:", e));
     } else {
-      // Dev build (`cargo xtask web`): drop a worker left behind by an earlier `dist` on this origin.
-      navigator.serviceWorker.getRegistrations().then((rs) => rs.forEach((r) => r.unregister()));
+      // Dev builds only remove this app's worker, not other sites sharing the origin.
+      const appScope = new URL("./", location.href).href;
+      navigator.serviceWorker.getRegistrations().then((rs) =>
+        rs.filter((r) => r.scope === appScope).forEach((r) => r.unregister()));
     }
   }
 </script>

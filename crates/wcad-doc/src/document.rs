@@ -52,7 +52,11 @@ pub struct DocMeta {
 
 impl Default for DocMeta {
     fn default() -> Self {
-        Self { title: String::new(), units: Units::Millimeter, app_version: String::new() }
+        Self {
+            title: String::new(),
+            units: Units::Millimeter,
+            app_version: String::new(),
+        }
     }
 }
 
@@ -107,7 +111,11 @@ impl Document {
     /// Assemble a document from loaded or imported data. History starts empty.
     pub fn from_parts(meta: DocMeta, drawing: Drawing, part: Part, mut ids: IdAllocator) -> Self {
         // Guard against foreign data whose ids exceed the allocator.
-        for id in drawing.entities.keys().chain(drawing.blocks.values().flat_map(|b| b.entities.keys())) {
+        for id in drawing
+            .entities
+            .keys()
+            .chain(drawing.blocks.values().flat_map(|b| b.entities.keys()))
+        {
             ids.bump_entity(*id);
         }
         for f in &part.features {
@@ -119,7 +127,10 @@ impl Document {
             part,
             ids,
             history: History::default(),
-            changes: ChangeSet { all: true, ..Default::default() },
+            changes: ChangeSet {
+                all: true,
+                ..Default::default()
+            },
             revision: 0,
             saved_revision: 0,
         }
@@ -345,10 +356,25 @@ impl<'a> Tx<'a> {
                 entities.push(EntityChange { id, before, after });
             }
         }
-        let tables = self.tables_before.filter(|b| *b != self.drawing.tables).map(|b| (b, self.drawing.tables.clone()));
-        let blocks = self.blocks_before.filter(|b| *b != self.drawing.blocks).map(|b| (b, self.drawing.blocks.clone()));
-        let part = self.part_before.filter(|b| b != &*self.part).map(|b| (b, self.part.clone()));
-        Transaction { label, entities, tables, blocks, part }
+        let tables = self
+            .tables_before
+            .filter(|b| *b != self.drawing.tables)
+            .map(|b| (b, self.drawing.tables.clone()));
+        let blocks = self
+            .blocks_before
+            .filter(|b| *b != self.drawing.blocks)
+            .map(|b| (b, self.drawing.blocks.clone()));
+        let part = self
+            .part_before
+            .filter(|b| b != &*self.part)
+            .map(|b| (b, self.part.clone()));
+        Transaction {
+            label,
+            entities,
+            tables,
+            blocks,
+            part,
+        }
     }
 }
 
@@ -361,7 +387,9 @@ mod tests {
     #[test]
     fn undo_redo_round_trip() {
         let mut doc = Document::new();
-        let id = doc.transact("line", |tx| tx.add(EntityKind::Line(Line2::new(DVec2::ZERO, DVec2::X))));
+        let id = doc.transact("line", |tx| {
+            tx.add(EntityKind::Line(Line2::new(DVec2::ZERO, DVec2::X)))
+        });
         assert_eq!(doc.drawing.entities.len(), 1);
         doc.transact("move", |tx| {
             tx.modify(id, |e| {

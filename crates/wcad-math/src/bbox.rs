@@ -9,10 +9,16 @@ pub struct BBox2 {
 }
 
 impl BBox2 {
-    pub const EMPTY: Self = Self { min: DVec2::splat(f64::INFINITY), max: DVec2::splat(f64::NEG_INFINITY) };
+    pub const EMPTY: Self = Self {
+        min: DVec2::splat(f64::INFINITY),
+        max: DVec2::splat(f64::NEG_INFINITY),
+    };
 
     pub fn new(a: DVec2, b: DVec2) -> Self {
-        Self { min: a.min(b), max: a.max(b) }
+        Self {
+            min: a.min(b),
+            max: a.max(b),
+        }
     }
 
     pub fn from_points<I: IntoIterator<Item = DVec2>>(pts: I) -> Self {
@@ -33,15 +39,25 @@ impl BBox2 {
     }
 
     pub fn union(&self, o: &Self) -> Self {
-        Self { min: self.min.min(o.min), max: self.max.max(o.max) }
+        Self {
+            min: self.min.min(o.min),
+            max: self.max.max(o.max),
+        }
     }
 
     pub fn expanded(&self, d: f64) -> Self {
-        Self { min: self.min - DVec2::splat(d), max: self.max + DVec2::splat(d) }
+        Self {
+            min: self.min - DVec2::splat(d),
+            max: self.max + DVec2::splat(d),
+        }
     }
 
     pub fn size(&self) -> DVec2 {
-        if self.is_empty() { DVec2::ZERO } else { self.max - self.min }
+        if self.is_empty() {
+            DVec2::ZERO
+        } else {
+            self.max - self.min
+        }
     }
 
     pub fn center(&self) -> DVec2 {
@@ -58,7 +74,10 @@ impl BBox2 {
     }
 
     pub fn intersects(&self, o: &Self) -> bool {
-        !(o.min.x > self.max.x || o.max.x < self.min.x || o.min.y > self.max.y || o.max.y < self.min.y)
+        !(o.min.x > self.max.x
+            || o.max.x < self.min.x
+            || o.min.y > self.max.y
+            || o.max.y < self.min.y)
     }
 }
 
@@ -76,7 +95,10 @@ pub struct BBox3 {
 }
 
 impl BBox3 {
-    pub const EMPTY: Self = Self { min: DVec3::splat(f64::INFINITY), max: DVec3::splat(f64::NEG_INFINITY) };
+    pub const EMPTY: Self = Self {
+        min: DVec3::splat(f64::INFINITY),
+        max: DVec3::splat(f64::NEG_INFINITY),
+    };
 
     pub fn from_points<I: IntoIterator<Item = DVec3>>(pts: I) -> Self {
         let mut b = Self::EMPTY;
@@ -96,11 +118,18 @@ impl BBox3 {
     }
 
     pub fn union(&self, o: &Self) -> Self {
-        Self { min: self.min.min(o.min), max: self.max.max(o.max) }
+        Self {
+            min: self.min.min(o.min),
+            max: self.max.max(o.max),
+        }
     }
 
     pub fn size(&self) -> DVec3 {
-        if self.is_empty() { DVec3::ZERO } else { self.max - self.min }
+        if self.is_empty() {
+            DVec3::ZERO
+        } else {
+            self.max - self.min
+        }
     }
 
     pub fn center(&self) -> DVec3 {

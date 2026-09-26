@@ -2,7 +2,9 @@
 
 use wcad_geom2d::Curve2;
 use wcad_math::DVec2;
-use wcad_sketch::{ArcEnd, ConstraintKind as K, DimValue, Error, SkConstraintId, SkEntityId, SkGeom, Sketch};
+use wcad_sketch::{
+    ArcEnd, ConstraintKind as K, DimValue, Error, SkConstraintId, SkEntityId, SkGeom, Sketch,
+};
 
 fn v(x: f64, y: f64) -> DVec2 {
     DVec2::new(x, y)
@@ -35,22 +37,36 @@ fn rectangle_builder_shares_points() {
 fn arc_builders_are_ccw() {
     let mut sk = Sketch::new();
     // clockwise input order p0 -> p1 -> p2 is stored CCW (ends swapped)
-    let cw = sk.add_arc_3points(v(0.0, 1.0), v(1.0, 0.0), v(0.0, -1.0)).unwrap();
-    let ccw = sk.add_arc_3points(v(0.0, -1.0), v(1.0, 0.0), v(0.0, 1.0)).unwrap();
+    let cw = sk
+        .add_arc_3points(v(0.0, 1.0), v(1.0, 0.0), v(0.0, -1.0))
+        .unwrap();
+    let ccw = sk
+        .add_arc_3points(v(0.0, -1.0), v(1.0, 0.0), v(0.0, 1.0))
+        .unwrap();
     for id in [cw, ccw] {
-        let Some(Curve2::Arc(a)) = sk.curve_of(&sk.entity(id).unwrap().geom) else { panic!("arc") };
+        let Some(Curve2::Arc(a)) = sk.curve_of(&sk.entity(id).unwrap().geom) else {
+            panic!("arc")
+        };
         assert!(a.c.distance(v(0.0, 0.0)) < 1e-12);
         assert!((a.r - 1.0).abs() < 1e-12);
         // the arc passes through (1, 0): the right half, sweep π
         assert!((a.sweep() - std::f64::consts::PI).abs() < 1e-9, "{a:?}");
         assert!(a.mid_point().distance(v(1.0, 0.0)) < 1e-9);
     }
-    assert!(matches!(sk.add_arc_3points(v(0.0, 0.0), v(1.0, 1.0), v(2.0, 2.0)), Err(Error::Degenerate(_))));
+    assert!(matches!(
+        sk.add_arc_3points(v(0.0, 0.0), v(1.0, 1.0), v(2.0, 2.0)),
+        Err(Error::Degenerate(_))
+    ));
     // center/start/end projects the end onto the circle
-    let a = sk.add_arc_center_start_end(v(0.0, 0.0), v(2.0, 0.0), v(0.0, 5.0)).unwrap();
+    let a = sk
+        .add_arc_center_start_end(v(0.0, 0.0), v(2.0, 0.0), v(0.0, 5.0))
+        .unwrap();
     let [_, _, e] = sk.arc_points(a).unwrap();
     assert!(sk.point(e).unwrap().distance(v(0.0, 2.0)) < 1e-12);
-    assert!(sk.add_arc_center_start_end(v(0.0, 0.0), v(0.0, 0.0), v(1.0, 0.0)).is_err());
+    assert!(
+        sk.add_arc_center_start_end(v(0.0, 0.0), v(0.0, 0.0), v(1.0, 0.0))
+            .is_err()
+    );
     let c = sk.add_circle_center_radius(v(3.0, 4.0), 2.5);
     assert_eq!(sk.radius_of(c), Some(2.5));
     assert_eq!(sk.point(sk.center_of(c).unwrap()), Some(v(3.0, 4.0)));
@@ -62,29 +78,77 @@ fn checked_constraints_reject_wrong_types() {
     let l = sk.add_line_points(v(0.0, 0.0), v(1.0, 0.0));
     let (a, b) = sk.line_ends(l).unwrap();
     let c = sk.add_circle_center_radius(v(0.0, 3.0), 1.0);
-    let arc = sk.add_arc_center_start_end(v(5.0, 0.0), v(6.0, 0.0), v(5.0, 1.0)).unwrap();
-    let bad = |sk: &mut Sketch, k: K| matches!(sk.add_constraint_checked(k), Err(Error::BadConstraint(_)));
+    let arc = sk
+        .add_arc_center_start_end(v(5.0, 0.0), v(6.0, 0.0), v(5.0, 1.0))
+        .unwrap();
+    let bad = |sk: &mut Sketch, k: K| {
+        matches!(sk.add_constraint_checked(k), Err(Error::BadConstraint(_)))
+    };
     assert!(bad(&mut sk, K::Horizontal { line: a }));
     assert!(bad(&mut sk, K::Coincident { p1: a, p2: l }));
     assert!(bad(&mut sk, K::Coincident { p1: a, p2: a }));
-    assert!(bad(&mut sk, K::Radius { round: l, value: DimValue::new(1.0) }));
-    assert!(bad(&mut sk, K::Radius { round: c, value: DimValue::new(-1.0) }));
-    assert!(bad(&mut sk, K::Distance { p1: a, p2: b, value: DimValue::new(f64::NAN) }));
-    assert!(bad(&mut sk, K::TangentArcLine { arc: c, end: ArcEnd::Start, line: l })); // circle is not an arc
+    assert!(bad(
+        &mut sk,
+        K::Radius {
+            round: l,
+            value: DimValue::new(1.0)
+        }
+    ));
+    assert!(bad(
+        &mut sk,
+        K::Radius {
+            round: c,
+            value: DimValue::new(-1.0)
+        }
+    ));
+    assert!(bad(
+        &mut sk,
+        K::Distance {
+            p1: a,
+            p2: b,
+            value: DimValue::new(f64::NAN)
+        }
+    ));
+    assert!(bad(
+        &mut sk,
+        K::TangentArcLine {
+            arc: c,
+            end: ArcEnd::Start,
+            line: l
+        }
+    )); // circle is not an arc
     assert!(bad(&mut sk, K::Midpoint { p: a, line: l }));
     assert!(bad(&mut sk, K::Parallel { line1: l, line2: l }));
     assert!(matches!(
-        sk.add_constraint_checked(K::Fix { p: SkEntityId(1234) }),
+        sk.add_constraint_checked(K::Fix {
+            p: SkEntityId(1234)
+        }),
         Err(Error::UnknownEntity(SkEntityId(1234)))
     ));
     assert!(sk.constraints.is_empty());
     // valid ones pass; arcs are rounds
-    sk.add_constraint_checked(K::EqualRadius { round1: c, round2: arc }).unwrap();
-    sk.add_constraint_checked(K::TangentArcLine { arc, end: ArcEnd::End, line: l }).unwrap();
-    sk.add_constraint_checked(K::PointOnCircle { p: a, round: arc }).unwrap();
-    assert!(matches!(sk.add_reference_dimension(K::Horizontal { line: l }), Err(Error::BadConstraint(_))));
+    sk.add_constraint_checked(K::EqualRadius {
+        round1: c,
+        round2: arc,
+    })
+    .unwrap();
+    sk.add_constraint_checked(K::TangentArcLine {
+        arc,
+        end: ArcEnd::End,
+        line: l,
+    })
+    .unwrap();
+    sk.add_constraint_checked(K::PointOnCircle { p: a, round: arc })
+        .unwrap();
+    assert!(matches!(
+        sk.add_reference_dimension(K::Horizontal { line: l }),
+        Err(Error::BadConstraint(_))
+    ));
     assert!(sk.set_driving(SkConstraintId(0), false).is_err()); // EqualRadius is not a dimension
-    assert!(matches!(sk.set_enabled(SkConstraintId(99), false), Err(Error::UnknownConstraint(_))));
+    assert!(matches!(
+        sk.set_enabled(SkConstraintId(99), false),
+        Err(Error::UnknownConstraint(_))
+    ));
 }
 
 #[test]
@@ -92,7 +156,10 @@ fn remove_entity_cascades() {
     let mut sk = Sketch::new();
     let r = sk.add_rectangle(v(0.0, 0.0), v(4.0, 2.0));
     let lone = sk.add_point(v(9.0, 9.0));
-    let on = sk.add_constraint(K::PointOnLine { p: lone, line: r.lines[0] });
+    let on = sk.add_constraint(K::PointOnLine {
+        p: lone,
+        line: r.lines[0],
+    });
     let fix = sk.add_constraint(K::Fix { p: r.corners[0] });
 
     // removing a line removes its constraints but keeps corners shared with other lines
@@ -109,7 +176,10 @@ fn remove_entity_cascades() {
     assert!(removed.constraints.contains(&fix));
     assert!(sk.point(r.corners[3]).is_some()); // still used by the top line
     assert!(sk.point(lone).is_some());
-    assert!(matches!(sk.remove_entity(r.corners[0]), Err(Error::UnknownEntity(_))));
+    assert!(matches!(
+        sk.remove_entity(r.corners[0]),
+        Err(Error::UnknownEntity(_))
+    ));
     // every remaining constraint references existing entities
     for c in sk.constraints.values() {
         sk.validate_constraint(&c.kind).unwrap();
@@ -127,11 +197,26 @@ fn serde_round_trip_preserves_everything() {
     let w = sk.add_constraint(K::Distance {
         p1: r.corners[0],
         p2: r.corners[1],
-        value: DimValue { value: 6.0, expr: Some("2*3".into()) },
+        value: DimValue {
+            value: 6.0,
+            expr: Some("2*3".into()),
+        },
     });
-    let reference = sk.add_reference_dimension(K::Length { line: r.lines[1], value: DimValue::new(1.0) }).unwrap();
-    let arc = sk.add_arc_3points(v(6.0, 0.0), v(7.0, 1.0), v(6.0, 2.0)).unwrap();
-    sk.add_constraint(K::TangentArcArc { arc1: arc, end1: ArcEnd::Start, arc2: arc, end2: ArcEnd::End });
+    let reference = sk
+        .add_reference_dimension(K::Length {
+            line: r.lines[1],
+            value: DimValue::new(1.0),
+        })
+        .unwrap();
+    let arc = sk
+        .add_arc_3points(v(6.0, 0.0), v(7.0, 1.0), v(6.0, 2.0))
+        .unwrap();
+    sk.add_constraint(K::TangentArcArc {
+        arc1: arc,
+        end1: ArcEnd::Start,
+        arc2: arc,
+        end2: ArcEnd::End,
+    });
     sk.set_construction(r.lines[2], true).unwrap();
     sk.set_enabled(w, false).unwrap();
     let json = serde_json::to_string_pretty(&sk).unwrap();
@@ -152,13 +237,86 @@ fn serde_round_trip_preserves_everything() {
     }"#;
     let mut m: Sketch = serde_json::from_str(minimal).unwrap();
     assert!(m.constraint(SkConstraintId(7)).unwrap().enabled);
-    assert_eq!(m.entity(SkEntityId(3)).unwrap().geom, SkGeom::Point { p: v(1.0, 2.0) });
+    assert_eq!(
+        m.entity(SkEntityId(3)).unwrap().geom,
+        SkGeom::Point { p: v(1.0, 2.0) }
+    );
     // the counter is behind the stored ids: allocation must not collide
     let p = m.add_point(v(0.0, 0.0));
     assert_eq!(p, SkEntityId(4));
     let c = m.add_constraint(K::Fix { p });
     assert_eq!(c, SkConstraintId(8));
     assert!(m.solve().converged);
+}
+
+#[test]
+fn sketch_ids_keep_numeric_values_and_decimal_map_keys() {
+    use std::collections::BTreeMap;
+
+    for value in [0, 1, 42, u32::MAX] {
+        let entity = SkEntityId(value);
+        let constraint = SkConstraintId(value);
+        let number = value.to_string();
+        assert_eq!(serde_json::to_string(&entity).unwrap(), number);
+        assert_eq!(serde_json::to_string(&constraint).unwrap(), number);
+        for json in [number.clone(), format!("\"{number}\"")] {
+            assert_eq!(serde_json::from_str::<SkEntityId>(&json).unwrap(), entity);
+            assert_eq!(
+                serde_json::from_str::<SkConstraintId>(&json).unwrap(),
+                constraint
+            );
+        }
+        let entities = BTreeMap::from([(entity, true)]);
+        let constraints = BTreeMap::from([(constraint, true)]);
+        let json = format!("{{\"{number}\":true}}");
+        assert_eq!(serde_json::to_string(&entities).unwrap(), json);
+        assert_eq!(serde_json::to_string(&constraints).unwrap(), json);
+        // Value also buffers string keys instead of using the streaming numeric-key adapter.
+        let buffered = serde_json::from_str::<serde_json::Value>(&json).unwrap();
+        assert_eq!(
+            serde_json::from_value::<BTreeMap<SkEntityId, bool>>(buffered.clone()).unwrap(),
+            entities
+        );
+        assert_eq!(
+            serde_json::from_value::<BTreeMap<SkConstraintId, bool>>(buffered).unwrap(),
+            constraints
+        );
+    }
+}
+
+#[test]
+fn sketch_ids_reject_invalid_values_without_truncation_or_wrapping() {
+    for json in [
+        "-1",
+        "1.5",
+        "1.0",
+        "1e2",
+        "4294967296",
+        "18446744073709551615",
+        "null",
+        "true",
+        "[]",
+        "{}",
+        r#""""#,
+        r#""-1""#,
+        r#""+1""#,
+        r#""1.5""#,
+        r#""1e2""#,
+        r#""4294967296""#,
+        r#"" 1""#,
+        r#""1 ""#,
+        r#""abc""#,
+        r#""\uFF11""#,
+    ] {
+        assert!(
+            serde_json::from_str::<SkEntityId>(json).is_err(),
+            "entity ID: {json}"
+        );
+        assert!(
+            serde_json::from_str::<SkConstraintId>(json).is_err(),
+            "constraint ID: {json}"
+        );
+    }
 }
 
 #[test]
@@ -181,9 +339,19 @@ fn corrupted_files_do_not_panic() {
     }"#;
     let mut sk: Sketch = serde_json::from_str(json).unwrap();
     let rep = sk.solve();
-    assert_eq!(rep.invalid, vec![SkConstraintId(0), SkConstraintId(1), SkConstraintId(3)]);
+    assert_eq!(
+        rep.invalid,
+        vec![SkConstraintId(0), SkConstraintId(1), SkConstraintId(3)]
+    );
     assert!(rep.converged);
-    assert!((sk.point(SkEntityId(3)).unwrap().distance(sk.point(SkEntityId(0)).unwrap()) - 5.0).abs() < 1e-9);
+    assert!(
+        (sk.point(SkEntityId(3))
+            .unwrap()
+            .distance(sk.point(SkEntityId(0)).unwrap())
+            - 5.0)
+            .abs()
+            < 1e-9
+    );
     let d = sk.diagnose();
     assert_eq!(d.invalid.len(), 3);
     assert!(sk.curves().is_empty());
@@ -196,7 +364,11 @@ fn corrupted_files_do_not_panic() {
     let mut sk = Sketch::new();
     let a = sk.add_point(v(f64::NAN, 0.0));
     let b = sk.add_point(v(1.0, 1.0));
-    sk.add_constraint(K::Distance { p1: a, p2: b, value: DimValue::new(2.0) });
+    sk.add_constraint(K::Distance {
+        p1: a,
+        p2: b,
+        value: DimValue::new(2.0),
+    });
     let rep = sk.solve();
     assert!(!rep.converged);
     assert!(sk.point(b).unwrap().is_finite());
@@ -209,19 +381,30 @@ fn scattered_constraint_order_still_solves() {
     // has a wide envelope, the solver reorders (RCM) and must give the same answer.
     let n = 40;
     let mut sk = Sketch::new();
-    let pts: Vec<SkEntityId> = (0..=n).map(|i| sk.add_point(v(i as f64 * 1.1, 0.3 * (i % 3) as f64))).collect();
+    let pts: Vec<SkEntityId> = (0..=n)
+        .map(|i| sk.add_point(v(i as f64 * 1.1, 0.3 * (i % 3) as f64)))
+        .collect();
     let lines: Vec<SkEntityId> = (0..n).map(|i| sk.add_line(pts[i], pts[i + 1])).collect();
     let mut order: Vec<usize> = (0..n).collect();
     let mut s: u64 = 5;
     for i in (1..n).rev() {
-        s = s.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        s = s
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         order.swap(i, (s >> 33) as usize % (i + 1));
     }
     sk.add_constraint(K::Fix { p: pts[0] });
     for &i in &order {
-        sk.add_constraint(K::Length { line: lines[i], value: DimValue::new(1.0) });
+        sk.add_constraint(K::Length {
+            line: lines[i],
+            value: DimValue::new(1.0),
+        });
         if i > 0 {
-            sk.add_constraint(K::Angle { line1: lines[i - 1], line2: lines[i], value: DimValue::new(0.05) });
+            sk.add_constraint(K::Angle {
+                line1: lines[i - 1],
+                line2: lines[i],
+                value: DimValue::new(0.05),
+            });
         }
     }
     sk.add_constraint(K::Horizontal { line: lines[0] });

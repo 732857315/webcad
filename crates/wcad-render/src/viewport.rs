@@ -17,7 +17,9 @@ pub fn choose_sample_count(adapter: &wgpu::Adapter, wanted: u32) -> u32 {
     let depth = adapter.get_texture_format_features(DEPTH_FORMAT).flags;
     [16, 8, 4, 2]
         .into_iter()
-        .find(|&n| n <= wanted && color.sample_count_supported(n) && depth.sample_count_supported(n))
+        .find(|&n| {
+            n <= wanted && color.sample_count_supported(n) && depth.sample_count_supported(n)
+        })
         .unwrap_or(1)
 }
 
@@ -62,7 +64,11 @@ fn clamp_size(device: &wgpu::Device, size: [u32; 2]) -> [u32; 2] {
 }
 
 fn make_targets(device: &wgpu::Device, size: [u32; 2], samples: u32) -> Targets {
-    let extent = wgpu::Extent3d { width: size[0], height: size[1], depth_or_array_layers: 1 };
+    let extent = wgpu::Extent3d {
+        width: size[0],
+        height: size[1],
+        depth_or_array_layers: 1,
+    };
     let tex = |label: &str, format, sample_count, usage| {
         device.create_texture(&wgpu::TextureDescriptor {
             label: Some(label),
@@ -79,16 +85,33 @@ fn make_targets(device: &wgpu::Device, size: [u32; 2], samples: u32) -> Targets 
         "wcad_viewport_color",
         COLOR_FORMAT,
         1,
-        wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_SRC,
+        wgpu::TextureUsages::RENDER_ATTACHMENT
+            | wgpu::TextureUsages::TEXTURE_BINDING
+            | wgpu::TextureUsages::COPY_SRC,
     );
     let msaa_view = (samples > 1).then(|| {
-        tex("wcad_viewport_msaa", COLOR_FORMAT, samples, wgpu::TextureUsages::RENDER_ATTACHMENT)
-            .create_view(&Default::default())
+        tex(
+            "wcad_viewport_msaa",
+            COLOR_FORMAT,
+            samples,
+            wgpu::TextureUsages::RENDER_ATTACHMENT,
+        )
+        .create_view(&Default::default())
     });
-    let depth_view = tex("wcad_viewport_depth", DEPTH_FORMAT, samples, wgpu::TextureUsages::RENDER_ATTACHMENT)
-        .create_view(&Default::default());
+    let depth_view = tex(
+        "wcad_viewport_depth",
+        DEPTH_FORMAT,
+        samples,
+        wgpu::TextureUsages::RENDER_ATTACHMENT,
+    )
+    .create_view(&Default::default());
     let color_view = color.create_view(&Default::default());
-    Targets { color, color_view, msaa_view, depth_view }
+    Targets {
+        color,
+        color_view,
+        msaa_view,
+        depth_view,
+    }
 }
 
 impl Viewport {

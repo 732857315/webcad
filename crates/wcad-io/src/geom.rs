@@ -61,7 +61,13 @@ pub(crate) fn bulge_arc(a: DVec2, b: DVec2, bulge: f64) -> Option<Seg> {
     if !finite(center) || !r.is_finite() {
         return None;
     }
-    Some(Seg::Arc { c: center, u: DVec2::new(r, 0.0), v: DVec2::new(0.0, r), t0, dt })
+    Some(Seg::Arc {
+        c: center,
+        u: DVec2::new(r, 0.0),
+        v: DVec2::new(0.0, r),
+        t0,
+        dt,
+    })
 }
 
 /// Segments of a polyline after its initial `Move` (closing segment included when closed).
@@ -91,7 +97,16 @@ pub(crate) fn curve_segs(curve: &Curve2) -> Option<(DVec2, Vec<Seg>)> {
             }
             let u = DVec2::new(c.r, 0.0);
             let v = DVec2::new(0.0, c.r);
-            Some((c.c + u, vec![Seg::Arc { c: c.c, u, v, t0: 0.0, dt: TAU }]))
+            Some((
+                c.c + u,
+                vec![Seg::Arc {
+                    c: c.c,
+                    u,
+                    v,
+                    t0: 0.0,
+                    dt: TAU,
+                }],
+            ))
         }
         Curve2::Arc(a) => {
             if !(a.r > 0.0) {
@@ -99,16 +114,38 @@ pub(crate) fn curve_segs(curve: &Curve2) -> Option<(DVec2, Vec<Seg>)> {
             }
             let u = DVec2::new(a.r, 0.0);
             let v = DVec2::new(0.0, a.r);
-            Some((a.start_point(), vec![Seg::Arc { c: a.c, u, v, t0: a.start, dt: a.sweep() }]))
+            Some((
+                a.start_point(),
+                vec![Seg::Arc {
+                    c: a.c,
+                    u,
+                    v,
+                    t0: a.start,
+                    dt: a.sweep(),
+                }],
+            ))
         }
         Curve2::Ellipse(e) => {
             if e.major.length_squared() < 1e-24 || !(e.ratio > 0.0) {
                 return None;
             }
-            let dt = if e.is_full() { TAU } else { wcad_math::ccw_sweep(e.start, e.end) };
+            let dt = if e.is_full() {
+                TAU
+            } else {
+                wcad_math::ccw_sweep(e.start, e.end)
+            };
             let u = e.major;
             let v = e.minor();
-            Some((e.at_param(e.start), vec![Seg::Arc { c: e.c, u, v, t0: e.start, dt }]))
+            Some((
+                e.at_param(e.start),
+                vec![Seg::Arc {
+                    c: e.c,
+                    u,
+                    v,
+                    t0: e.start,
+                    dt,
+                }],
+            ))
         }
         Curve2::Polyline(p) => polyline_segs(p),
         Curve2::Spline(s) => nurbs_segs(s).or_else(|| spline_fallback(s)),
@@ -117,7 +154,9 @@ pub(crate) fn curve_segs(curve: &Curve2) -> Option<(DVec2, Vec<Seg>)> {
 
 /// A full path (`Move` + segments) for a curve; closed curves end with `Close`.
 pub(crate) fn curve_path(curve: &Curve2) -> Path {
-    let Some((start, segs)) = curve_segs(curve) else { return Vec::new() };
+    let Some((start, segs)) = curve_segs(curve) else {
+        return Vec::new();
+    };
     let mut path = Vec::with_capacity(segs.len() + 2);
     path.push(Seg::Move(start));
     path.extend(segs);
@@ -160,7 +199,13 @@ pub(crate) fn reverse_segs(start: DVec2, segs: &[Seg]) -> (DVec2, Vec<Seg>) {
         match *s {
             Seg::Line(_) | Seg::Move(_) => out.push(Seg::Line(from)),
             Seg::Cubic(c1, c2, _) => out.push(Seg::Cubic(c2, c1, from)),
-            Seg::Arc { c, u, v, t0, dt } => out.push(Seg::Arc { c, u, v, t0: t0 + dt, dt: -dt }),
+            Seg::Arc { c, u, v, t0, dt } => out.push(Seg::Arc {
+                c,
+                u,
+                v,
+                t0: t0 + dt,
+                dt: -dt,
+            }),
             Seg::Close => {}
         }
     }
@@ -173,7 +218,9 @@ pub(crate) fn loop_path(curves: &[Curve2], out: &mut Path) {
     let mut first = true;
     let mut cur = DVec2::ZERO;
     for c in curves {
-        let Some((s, segs)) = curve_segs(c) else { continue };
+        let Some((s, segs)) = curve_segs(c) else {
+            continue;
+        };
         let e = segs_end(s, &segs);
         let (s, segs) = if !first && cur.distance_squared(e) < cur.distance_squared(s) {
             reverse_segs(s, &segs)
@@ -215,7 +262,13 @@ pub(crate) fn transform_path(path: &mut Path, m: &DAffine2) {
 }
 
 /// Cubic Bézier pieces `(c1, c2, end)` approximating an elliptical arc (≤ 90° per piece).
-pub(crate) fn arc_to_cubics(c: DVec2, u: DVec2, v: DVec2, t0: f64, dt: f64) -> Vec<(DVec2, DVec2, DVec2)> {
+pub(crate) fn arc_to_cubics(
+    c: DVec2,
+    u: DVec2,
+    v: DVec2,
+    t0: f64,
+    dt: f64,
+) -> Vec<(DVec2, DVec2, DVec2)> {
     if !dt.is_finite() || dt == 0.0 {
         return Vec::new();
     }
@@ -249,7 +302,11 @@ pub(crate) fn ellipse_axes(u: DVec2, v: DVec2) -> (f64, f64, f64) {
 
 /// Polylines approximating each sub-path (closed sub-paths repeat their first point at the end).
 pub(crate) fn flatten(path: &[Seg], tol: f64) -> Vec<Vec<DVec2>> {
-    let tol = if tol.is_finite() && tol > 0.0 { tol } else { 1e-3 };
+    let tol = if tol.is_finite() && tol > 0.0 {
+        tol
+    } else {
+        1e-3
+    };
     let mut out: Vec<Vec<DVec2>> = Vec::new();
     let mut cur_poly: Vec<DVec2> = Vec::new();
     let mut cur = DVec2::ZERO;
@@ -277,8 +334,17 @@ pub(crate) fn flatten(path: &[Seg], tol: f64) -> Vec<Vec<DVec2>> {
                     cur_poly.push(cur);
                 }
                 let r = u.length().max(v.length());
-                let step = if r > tol { 2.0 * (1.0 - tol / r).clamp(-1.0, 1.0).acos() } else { dt.abs() };
-                let n = if step > 1e-9 { (dt.abs() / step).ceil() as usize } else { 1 }.clamp(1, 4096);
+                let step = if r > tol {
+                    2.0 * (1.0 - tol / r).clamp(-1.0, 1.0).acos()
+                } else {
+                    dt.abs()
+                };
+                let n = if step > 1e-9 {
+                    (dt.abs() / step).ceil() as usize
+                } else {
+                    1
+                }
+                .clamp(1, 4096);
                 for i in 1..=n {
                     cur_poly.push(arc_point(c, u, v, t0 + dt * i as f64 / n as f64));
                 }
@@ -294,14 +360,20 @@ pub(crate) fn flatten(path: &[Seg], tol: f64) -> Vec<Vec<DVec2>> {
                     let t = i as f64 / n as f64;
                     let mt = 1.0 - t;
                     cur_poly.push(
-                        cur * (mt * mt * mt) + c1 * (3.0 * mt * mt * t) + c2 * (3.0 * mt * t * t) + p * (t * t * t),
+                        cur * (mt * mt * mt)
+                            + c1 * (3.0 * mt * mt * t)
+                            + c2 * (3.0 * mt * t * t)
+                            + p * (t * t * t),
                     );
                 }
                 cur = p;
             }
             Seg::Close => {
                 if !cur_poly.is_empty() {
-                    if cur_poly.last().is_some_and(|l| l.distance_squared(start) > 0.0) {
+                    if cur_poly
+                        .last()
+                        .is_some_and(|l| l.distance_squared(start) > 0.0)
+                    {
                         cur_poly.push(start);
                     }
                     out.push(std::mem::take(&mut cur_poly));
@@ -359,7 +431,11 @@ pub(crate) fn bbox_add_point(bbox: &mut Option<BBox2>, p: DVec2) {
 type H = [f64; 3]; // homogeneous (x·w, y·w, w)
 
 fn hlerp(a: H, b: H, t: f64) -> H {
-    [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]
+    [
+        a[0] + (b[0] - a[0]) * t,
+        a[1] + (b[1] - a[1]) * t,
+        a[2] + (b[2] - a[2]) * t,
+    ]
 }
 
 fn hproject(h: H) -> Option<DVec2> {
@@ -386,7 +462,11 @@ fn insert_knot(p: usize, knots: &mut Vec<f64>, pts: &mut Vec<H>, u: f64) -> Opti
             q.push(pts[i - 1]);
         } else {
             let denom = knots[i + p] - knots[i];
-            let alpha = if denom.abs() > 0.0 { (u - knots[i]) / denom } else { 0.0 };
+            let alpha = if denom.abs() > 0.0 {
+                (u - knots[i]) / denom
+            } else {
+                0.0
+            };
             q.push(hlerp(pts[i - 1], pts[i], alpha));
         }
     }
@@ -430,7 +510,9 @@ pub(crate) fn nurbs_segs(s: &Nurbs2) -> Option<(DVec2, Vec<Seg>)> {
     }
     let rational = rational_data && {
         let w0 = s.weights[0];
-        s.weights.iter().any(|w| (w - w0).abs() > 1e-12 * w0.abs().max(1.0))
+        s.weights
+            .iter()
+            .any(|w| (w - w0).abs() > 1e-12 * w0.abs().max(1.0))
     };
     let mut knots = s.knots.clone();
     let a = knots[p];
@@ -441,7 +523,11 @@ pub(crate) fn nurbs_segs(s: &Nurbs2) -> Option<(DVec2, Vec<Seg>)> {
     if n > MAX_EXACT_CTRL {
         return nurbs_sampled(p, &knots, &pts, a, b);
     }
-    let mut values: Vec<f64> = knots.iter().copied().filter(|&k| k >= a && k <= b).collect();
+    let mut values: Vec<f64> = knots
+        .iter()
+        .copied()
+        .filter(|&k| k >= a && k <= b)
+        .collect();
     values.dedup();
     for u in values {
         let mult = knots.iter().filter(|&&k| k == u).count();
@@ -462,12 +548,17 @@ pub(crate) fn nurbs_segs(s: &Nurbs2) -> Option<(DVec2, Vec<Seg>)> {
             start = Some(p0);
         }
         if !rational && p <= 3 {
-            let q: Vec<DVec2> = cps.iter().map(|&h| hproject(h)).collect::<Option<Vec<_>>>()?;
+            let q: Vec<DVec2> = cps
+                .iter()
+                .map(|&h| hproject(h))
+                .collect::<Option<Vec<_>>>()?;
             match p {
                 1 => segs.push(Seg::Line(q[1])),
-                2 => {
-                    segs.push(Seg::Cubic(q[0] + (q[1] - q[0]) * (2.0 / 3.0), q[2] + (q[1] - q[2]) * (2.0 / 3.0), q[2]))
-                }
+                2 => segs.push(Seg::Cubic(
+                    q[0] + (q[1] - q[0]) * (2.0 / 3.0),
+                    q[2] + (q[1] - q[2]) * (2.0 / 3.0),
+                    q[2],
+                )),
                 _ => segs.push(Seg::Cubic(q[1], q[2], q[3])),
             }
         } else {
@@ -492,7 +583,11 @@ fn de_boor(p: usize, knots: &[f64], pts: &[H], j: usize, u: f64) -> H {
         for i in (r..=p).rev() {
             let idx = j - p + i;
             let denom = knots[idx + p + 1 - r] - knots[idx];
-            let alpha = if denom != 0.0 { (u - knots[idx]) / denom } else { 0.0 };
+            let alpha = if denom != 0.0 {
+                (u - knots[idx]) / denom
+            } else {
+                0.0
+            };
             d[i] = hlerp(d[i - 1], d[i], alpha);
         }
     }
@@ -524,7 +619,11 @@ fn nurbs_sampled(p: usize, knots: &[f64], pts: &[H], a: f64, b: f64) -> Option<(
 
 /// Polyline through fit points (or the control polygon) for splines with unusable knot data.
 fn spline_fallback(s: &Nurbs2) -> Option<(DVec2, Vec<Seg>)> {
-    let pts = if s.fit_points.len() >= 2 { &s.fit_points } else { &s.ctrl };
+    let pts = if s.fit_points.len() >= 2 {
+        &s.fit_points
+    } else {
+        &s.ctrl
+    };
     let first = *pts.first()?;
     if pts.len() < 2 {
         return None;
@@ -559,7 +658,9 @@ mod tests {
             fn nip(k: &[f64], i: usize, p: usize, u: f64) -> f64 {
                 if p == 0 {
                     let last = k[k.len() - 1];
-                    return if (k[i] <= u && u < k[i + 1]) || (u == last && k[i] < u && u <= k[i + 1]) {
+                    return if (k[i] <= u && u < k[i + 1])
+                        || (u == last && k[i] < u && u <= k[i + 1])
+                    {
                         1.0
                     } else {
                         0.0
@@ -581,7 +682,11 @@ mod tests {
         let mut num = DVec2::ZERO;
         let mut den = 0.0;
         for i in 0..n {
-            let w = if s.weights.is_empty() { 1.0 } else { s.weights[i] };
+            let w = if s.weights.is_empty() {
+                1.0
+            } else {
+                s.weights[i]
+            };
             let b = basis(i, u) * w;
             num += s.ctrl[i] * b;
             den += b;
@@ -591,7 +696,9 @@ mod tests {
 
     #[test]
     fn bulge_semicircle() {
-        let Some(Seg::Arc { c, u, t0, dt, .. }) = bulge_arc(DVec2::ZERO, DVec2::new(10.0, 0.0), 1.0) else {
+        let Some(Seg::Arc { c, u, t0, dt, .. }) =
+            bulge_arc(DVec2::ZERO, DVec2::new(10.0, 0.0), 1.0)
+        else {
             panic!("expected arc")
         };
         assert!(c.distance(DVec2::new(5.0, 0.0)) < 1e-12);
@@ -621,26 +728,51 @@ mod tests {
         assert_eq!(segs.len(), 3);
         assert!(start.distance(DVec2::ZERO) < 1e-12);
         // Segment ends are the curve at the knots.
-        let ends: Vec<DVec2> = segs.iter().map(|s| if let Seg::Cubic(_, _, p) = s { *p } else { DVec2::NAN }).collect();
+        let ends: Vec<DVec2> = segs
+            .iter()
+            .map(|s| {
+                if let Seg::Cubic(_, _, p) = s {
+                    *p
+                } else {
+                    DVec2::NAN
+                }
+            })
+            .collect();
         for (e, u) in ends.iter().zip([1.0, 2.5, 4.0]) {
-            assert!(e.distance(eval_nurbs(&s, u)) < 1e-9, "{e:?} vs {:?}", eval_nurbs(&s, u));
+            assert!(
+                e.distance(eval_nurbs(&s, u)) < 1e-9,
+                "{e:?} vs {:?}",
+                eval_nurbs(&s, u)
+            );
         }
         // Mid-span point of the first Bézier equals the curve at u = 0.5.
         if let Seg::Cubic(c1, c2, p3) = segs[0] {
             let t: f64 = 0.5;
             let mt = 1.0 - t;
-            let b = start * mt.powi(3) + c1 * 3.0 * mt * mt * t + c2 * 3.0 * mt * t * t + p3 * t.powi(3);
+            let b = start * mt.powi(3)
+                + c1 * 3.0 * mt * mt * t
+                + c2 * 3.0 * mt * t * t
+                + p3 * t.powi(3);
             assert!(b.distance(eval_nurbs(&s, 0.5)) < 1e-9);
         }
     }
 
     #[test]
     fn sampled_matches_exact() {
-        let ctrl: Vec<DVec2> = (0..40).map(|i| DVec2::new(i as f64, ((i * 7) % 5) as f64)).collect();
+        let ctrl: Vec<DVec2> = (0..40)
+            .map(|i| DVec2::new(i as f64, ((i * 7) % 5) as f64))
+            .collect();
         let mut knots = vec![0.0; 4];
         knots.extend((1..37).map(|i| i as f64));
         knots.extend([37.0; 4]);
-        let s = Nurbs2 { degree: 3, ctrl, weights: vec![], knots, fit_points: vec![], closed: false };
+        let s = Nurbs2 {
+            degree: 3,
+            ctrl,
+            weights: vec![],
+            knots,
+            fit_points: vec![],
+            closed: false,
+        };
         let pts: Vec<H> = s.ctrl.iter().map(|p| [p.x, p.y, 1.0]).collect();
         let (s1, segs) = nurbs_sampled(3, &s.knots, &pts, 0.0, 37.0).expect("sampled");
         let (s2, exact) = nurbs_segs(&s).expect("exact");
@@ -653,7 +785,12 @@ mod tests {
     fn unclamped_and_bad_splines() {
         let s = Nurbs2 {
             degree: 2,
-            ctrl: vec![DVec2::new(0.0, 0.0), DVec2::new(1.0, 1.0), DVec2::new(2.0, 0.0), DVec2::new(3.0, 1.0)],
+            ctrl: vec![
+                DVec2::new(0.0, 0.0),
+                DVec2::new(1.0, 1.0),
+                DVec2::new(2.0, 0.0),
+                DVec2::new(3.0, 1.0),
+            ],
             weights: vec![],
             knots: vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
             fit_points: vec![],
@@ -662,9 +799,15 @@ mod tests {
         let (start, segs) = nurbs_segs(&s).expect("unclamped spline");
         assert!(start.distance(eval_nurbs(&s, 2.0)) < 1e-9);
         assert!(segs_end(start, &segs).distance(eval_nurbs(&s, 4.0 - 1e-12)) < 1e-6);
-        let bad = Nurbs2 { knots: vec![0.0, 1.0], ..s.clone() };
+        let bad = Nurbs2 {
+            knots: vec![0.0, 1.0],
+            ..s.clone()
+        };
         assert!(nurbs_segs(&bad).is_none());
-        assert!(curve_segs(&Curve2::Spline(bad)).is_some(), "falls back to the control polygon");
+        assert!(
+            curve_segs(&Curve2::Spline(bad)).is_some(),
+            "falls back to the control polygon"
+        );
     }
 
     #[test]
@@ -690,7 +833,9 @@ mod tests {
         let m = DAffine2::from_scale(DVec2::new(2.0, 1.0));
         let mut p = curve_path(&Curve2::Circle(wcad_geom2d::Circle2::new(DVec2::ZERO, 1.0)));
         transform_path(&mut p, &m);
-        let Seg::Arc { u, v, .. } = p[1] else { panic!() };
+        let Seg::Arc { u, v, .. } = p[1] else {
+            panic!()
+        };
         let (rx, ry, ang) = ellipse_axes(u, v);
         assert!((rx - 2.0).abs() < 1e-12 && (ry - 1.0).abs() < 1e-12 && ang.abs() < 1e-12);
         let cubics = arc_to_cubics(DVec2::ZERO, u, v, 0.0, TAU);

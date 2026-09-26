@@ -82,8 +82,10 @@ pub(crate) fn lineweight_from(w: ALineWeight) -> LineWeight {
 }
 
 /// Standard DXF lineweights (1/100 mm); other values are snapped to the nearest one on export.
-const STANDARD_WEIGHTS: [i16; 24] =
-    [0, 5, 9, 13, 15, 18, 20, 25, 30, 35, 40, 50, 53, 60, 70, 80, 90, 100, 106, 120, 140, 158, 200, 211];
+const STANDARD_WEIGHTS: [i16; 24] = [
+    0, 5, 9, 13, 15, 18, 20, 25, 30, 35, 40, 50, 53, 60, 70, 80, 90, 100, 106, 120, 140, 158, 200,
+    211,
+];
 
 pub(crate) fn lineweight_to(w: LineWeight) -> ALineWeight {
     match w {
@@ -92,7 +94,11 @@ pub(crate) fn lineweight_to(w: LineWeight) -> ALineWeight {
         LineWeight::Default => ALineWeight::Default,
         LineWeight::Mm100(v) => {
             let v = v.min(211) as i16;
-            let best = STANDARD_WEIGHTS.iter().copied().min_by_key(|s| (s - v).abs()).unwrap_or(25);
+            let best = STANDARD_WEIGHTS
+                .iter()
+                .copied()
+                .min_by_key(|s| (s - v).abs())
+                .unwrap_or(25);
             ALineWeight::Value(best)
         }
     }
@@ -141,10 +147,19 @@ mod tests {
     #[test]
     fn color_and_weight_mapping() {
         assert_eq!(color_from(color_to(Color::Aci(3))), Color::Aci(3));
-        assert_eq!(color_from(color_to(Color::Rgb(1, 2, 3))), Color::Rgb(1, 2, 3));
+        assert_eq!(
+            color_from(color_to(Color::Rgb(1, 2, 3))),
+            Color::Rgb(1, 2, 3)
+        );
         assert_eq!(color_from(color_to(Color::ByBlock)), Color::ByBlock);
-        assert_eq!(lineweight_from(lineweight_to(LineWeight::Mm100(35))), LineWeight::Mm100(35));
-        assert_eq!(lineweight_from(lineweight_to(LineWeight::Mm100(33))), LineWeight::Mm100(35));
+        assert_eq!(
+            lineweight_from(lineweight_to(LineWeight::Mm100(35))),
+            LineWeight::Mm100(35)
+        );
+        assert_eq!(
+            lineweight_from(lineweight_to(LineWeight::Mm100(33))),
+            LineWeight::Mm100(35)
+        );
         for a in [0.3, 1.2, 2.0, -2.5] {
             let p = ellipse_angle_to_param(0.4, a);
             assert!((wcad_math::normalize_pi(ellipse_param_to_angle(0.4, p) - a)).abs() < 1e-12);

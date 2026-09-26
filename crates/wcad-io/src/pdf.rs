@@ -40,7 +40,10 @@ impl Paper {
             Paper::A1 => (594.0, 841.0),
             Paper::A0 => (841.0, 1189.0),
             Paper::Letter => (215.9, 279.4),
-            Paper::Custom { width_mm, height_mm } => (width_mm, height_mm),
+            Paper::Custom {
+                width_mm,
+                height_mm,
+            } => (width_mm, height_mm),
         }
     }
 }
@@ -58,7 +61,10 @@ pub enum PlotScale {
 impl PlotScale {
     /// `1:n` for a drawing in millimetres.
     pub fn one_to(n: f64) -> Self {
-        PlotScale::Ratio { paper_mm: 1.0, drawing_units: n }
+        PlotScale::Ratio {
+            paper_mm: 1.0,
+            drawing_units: n,
+        }
     }
 }
 
@@ -118,36 +124,64 @@ impl Map {
 }
 
 fn f(v: f64) -> f32 {
-    if v.is_finite() && v.abs() > 1e-9 { v as f32 } else { 0.0 }
+    if v.is_finite() && v.abs() > 1e-9 {
+        v as f32
+    } else {
+        0.0
+    }
 }
 
 /// Export the model space of `drawing` as a one-page vector PDF.
 pub fn export(drawing: &Drawing, setup: &PageSetup) -> Result<Vec<u8>> {
     let (pw, ph) = setup.page_size_mm();
-    if !(pw.is_finite() && ph.is_finite() && pw > 1.0 && ph > 1.0 && pw < 20_000.0 && ph < 20_000.0) {
+    if !(pw.is_finite() && ph.is_finite() && pw > 1.0 && ph > 1.0 && pw < 20_000.0 && ph < 20_000.0)
+    {
         return Err(Error::PageSetup(format!("paper size {pw} × {ph} mm")));
     }
     let margin = setup.margin_mm;
     if !(margin.is_finite() && margin >= 0.0 && 2.0 * margin < pw.min(ph)) {
         return Err(Error::PageSetup(format!("margin {margin} mm")));
     }
-    let scene =
-        scene::build(drawing, SceneOptions { foreground: [0, 0, 0], monochrome: setup.monochrome, plot_only: true });
+    let scene = scene::build(
+        drawing,
+        SceneOptions {
+            foreground: [0, 0, 0],
+            monochrome: setup.monochrome,
+            plot_only: true,
+        },
+    );
     let window = setup.window.or(scene.bbox);
 
     let printable = DVec2::new(pw - 2.0 * margin, ph - 2.0 * margin);
     let mm_per_unit = match setup.scale {
-        PlotScale::Ratio { paper_mm, drawing_units } => {
-            if !(paper_mm.is_finite() && drawing_units.is_finite() && paper_mm > 0.0 && drawing_units > 0.0) {
-                return Err(Error::PageSetup(format!("scale {paper_mm}:{drawing_units}")));
+        PlotScale::Ratio {
+            paper_mm,
+            drawing_units,
+        } => {
+            if !(paper_mm.is_finite()
+                && drawing_units.is_finite()
+                && paper_mm > 0.0
+                && drawing_units > 0.0)
+            {
+                return Err(Error::PageSetup(format!(
+                    "scale {paper_mm}:{drawing_units}"
+                )));
             }
             paper_mm / drawing_units
         }
         PlotScale::Fit => match window {
             Some(b) => {
                 let size = b.max - b.min;
-                let kx = if size.x > 0.0 { printable.x / size.x } else { f64::INFINITY };
-                let ky = if size.y > 0.0 { printable.y / size.y } else { f64::INFINITY };
+                let kx = if size.x > 0.0 {
+                    printable.x / size.x
+                } else {
+                    f64::INFINITY
+                };
+                let ky = if size.y > 0.0 {
+                    printable.y / size.y
+                } else {
+                    f64::INFINITY
+                };
                 let k = kx.min(ky);
                 if k.is_finite() && k > 0.0 { k } else { 1.0 }
             }
@@ -162,7 +196,12 @@ pub fn export(drawing: &Drawing, setup: &PageSetup) -> Result<Vec<u8>> {
 
     let mut c = Content::new();
     // Clip to the printable area.
-    c.rect(f(margin * PT_PER_MM), f(margin * PT_PER_MM), f(printable.x * PT_PER_MM), f(printable.y * PT_PER_MM));
+    c.rect(
+        f(margin * PT_PER_MM),
+        f(margin * PT_PER_MM),
+        f(printable.x * PT_PER_MM),
+        f(printable.y * PT_PER_MM),
+    );
     c.clip_nonzero();
     c.end_path();
     c.set_line_cap(LineCapStyle::RoundCap);
@@ -172,11 +211,17 @@ pub fn export(drawing: &Drawing, setup: &PageSetup) -> Result<Vec<u8>> {
     for item in &scene.items {
         match item {
             Item::Stroke { path, style } => {
-                let wmm = if setup.line_weights { style.weight_mm.max(0.05) } else { 0.13 };
+                let wmm = if setup.line_weights {
+                    style.weight_mm.max(0.05)
+                } else {
+                    0.13
+                };
                 state.stroke_color(&mut c, style.color);
                 state.line_width(&mut c, wmm * PT_PER_MM);
-                let dash: Option<Vec<f32>> =
-                    style.dash.as_ref().map(|d| d.iter().map(|v| f((v * map.k).max(0.0))).collect());
+                let dash: Option<Vec<f32>> = style
+                    .dash
+                    .as_ref()
+                    .map(|d| d.iter().map(|v| f((v * map.k).max(0.0))).collect());
                 state.dash(&mut c, dash);
                 emit_path(&mut c, path, &map);
                 c.stroke();
@@ -186,7 +231,11 @@ pub fn export(drawing: &Drawing, setup: &PageSetup) -> Result<Vec<u8>> {
                 emit_path(&mut c, path, &map);
                 c.fill_even_odd();
             }
-            Item::Point { p, color, weight_mm } => {
+            Item::Point {
+                p,
+                color,
+                weight_mm,
+            } => {
                 state.stroke_color(&mut c, *color);
                 state.line_width(&mut c, (weight_mm * PT_PER_MM).max(1.0));
                 state.dash(&mut c, None);
@@ -197,7 +246,10 @@ pub fn export(drawing: &Drawing, setup: &PageSetup) -> Result<Vec<u8>> {
             }
             Item::Text(t) => {
                 state.fill_color(&mut c, t.color);
-                let drawn = setup.font.as_ref().is_some_and(|font| text_outlines(&mut c, font, t, &map));
+                let drawn = setup
+                    .font
+                    .as_ref()
+                    .is_some_and(|font| text_outlines(&mut c, font, t, &map));
                 if !drawn {
                     text_fallback(&mut c, t, &map);
                 }
@@ -223,10 +275,14 @@ pub fn export(drawing: &Drawing, setup: &PageSetup) -> Result<Vec<u8>> {
         page.resources().fonts().pair(Name(b"F1"), font_id);
         page.finish();
     }
-    pdf.type1_font(font_id).base_font(Name(b"Helvetica")).encoding_predefined(Name(b"WinAnsiEncoding"));
-    pdf.document_info(info_id).producer(pdf_writer::TextStr("webcad2026"));
+    pdf.type1_font(font_id)
+        .base_font(Name(b"Helvetica"))
+        .encoding_predefined(Name(b"WinAnsiEncoding"));
+    pdf.document_info(info_id)
+        .producer(pdf_writer::TextStr("webcad2026"));
     let compressed = miniz_oxide::deflate::compress_to_vec_zlib(&content, 6);
-    pdf.stream(content_id, &compressed).filter(Filter::FlateDecode);
+    pdf.stream(content_id, &compressed)
+        .filter(Filter::FlateDecode);
     Ok(pdf.finish())
 }
 
@@ -240,7 +296,11 @@ struct State {
 }
 
 fn rgb(c: [u8; 3]) -> (f32, f32, f32) {
-    (c[0] as f32 / 255.0, c[1] as f32 / 255.0, c[2] as f32 / 255.0)
+    (
+        c[0] as f32 / 255.0,
+        c[1] as f32 / 255.0,
+        c[2] as f32 / 255.0,
+    )
 }
 
 impl State {
@@ -296,7 +356,13 @@ fn emit_path(c: &mut Content, path: &[Seg], map: &Map) {
                 c.cubic_to(f(a.x), f(a.y), f(b.x), f(b.y), f(q.x), f(q.y));
                 cur = p;
             }
-            Seg::Arc { c: center, u, v, t0, dt } => {
+            Seg::Arc {
+                c: center,
+                u,
+                v,
+                t0,
+                dt,
+            } => {
                 for (a, b, p) in arc_to_cubics(center, u, v, t0, dt) {
                     let (a, b, q) = (map.p(a), map.p(b), map.p(p));
                     c.cubic_to(f(a.x), f(a.y), f(b.x), f(b.y), f(q.x), f(q.y));

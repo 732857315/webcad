@@ -22,7 +22,10 @@ impl MeshData {
     /// Local bounds of all vertices.
     pub fn bbox(&self) -> BBox3 {
         BBox3::from_points(
-            self.positions.iter().filter(|p| p.iter().all(|c| c.is_finite())).map(|p| DVec3::from(p.map(f64::from))),
+            self.positions
+                .iter()
+                .filter(|p| p.iter().all(|c| c.is_finite()))
+                .map(|p| DVec3::from(p.map(f64::from))),
         )
     }
 
@@ -37,7 +40,9 @@ impl MeshData {
                 continue;
             }
             let (a, b, c) = (p(t[0]), p(t[1]), p(t[2]));
-            let Some(fnrm) = (b - a).cross(c - a).try_normalize() else { continue };
+            let Some(fnrm) = (b - a).cross(c - a).try_normalize() else {
+                continue;
+            };
             for (i, prev, next) in [(t[0], c, b), (t[1], a, c), (t[2], b, a)] {
                 let corner = p(i);
                 let angle = (prev - corner).angle_between(next - corner);
@@ -46,21 +51,29 @@ impl MeshData {
                 }
             }
         }
-        acc.into_iter().map(|v| v.normalize_or(DVec3::Z).as_vec3().to_array()).collect()
+        acc.into_iter()
+            .map(|v| v.normalize_or(DVec3::Z).as_vec3().to_array())
+            .collect()
     }
 
     /// Nearest triangle hit by `ray` with `t >= t_min`: `(triangle index, t)`. `transform` places the mesh.
     pub fn pick(&self, ray: &Ray3, transform: &DMat4, t_min: f64) -> Option<(usize, f64)> {
         let n = self.positions.len();
-        let world: Vec<DVec3> =
-            self.positions.iter().map(|p| transform.transform_point3(DVec3::from(p.map(f64::from)))).collect();
+        let world: Vec<DVec3> = self
+            .positions
+            .iter()
+            .map(|p| transform.transform_point3(DVec3::from(p.map(f64::from))))
+            .collect();
         let mut best: Option<(usize, f64)> = None;
         for (ti, t) in self.indices.as_chunks::<3>().0.iter().enumerate() {
             if t.iter().any(|&i| i as usize >= n) {
                 continue;
             }
-            if let Some(hit) = ray.intersect_triangle(world[t[0] as usize], world[t[1] as usize], world[t[2] as usize])
-                && hit >= t_min
+            if let Some(hit) = ray.intersect_triangle(
+                world[t[0] as usize],
+                world[t[1] as usize],
+                world[t[2] as usize],
+            ) && hit >= t_min
                 && best.is_none_or(|(_, b)| hit < b)
             {
                 best = Some((ti, hit));
@@ -85,7 +98,12 @@ pub struct MeshStyle {
 
 impl Default for MeshStyle {
     fn default() -> Self {
-        Self { transform: DMat4::IDENTITY, color: [0.72, 0.74, 0.78, 1.0], highlight_ranges: Vec::new(), visible: true }
+        Self {
+            transform: DMat4::IDENTITY,
+            color: [0.72, 0.74, 0.78, 1.0],
+            highlight_ranges: Vec::new(),
+            visible: true,
+        }
     }
 }
 
@@ -116,7 +134,12 @@ impl LineSet3D {
 
     pub fn push_segment(&mut self, a: [f32; 3], b: [f32; 3], color: Rgba) {
         let c = pack_rgba(color);
-        self.segments.push(LineSegment3D { a, b, color_a: c, color_b: c });
+        self.segments.push(LineSegment3D {
+            a,
+            b,
+            color_a: c,
+            color_b: c,
+        });
     }
 
     /// Adds a segment from `f64` points (cast to `f32`; keep them near the local origin).
@@ -146,7 +169,12 @@ impl LineSet3D {
 
     /// Adds a polyline given in 2D coordinates of `plane` (sketch curves), converted to world
     /// coordinates (use an identity transform, or subtract a local origin first for huge coordinates).
-    pub fn push_plane_polyline(&mut self, plane: &Plane, pts: &[wcad_math::DVec2], color: Rgba) -> Range<u32> {
+    pub fn push_plane_polyline(
+        &mut self,
+        plane: &Plane,
+        pts: &[wcad_math::DVec2],
+        color: Rgba,
+    ) -> Range<u32> {
         let world: Vec<DVec3> = pts.iter().map(|&p| plane.to_world(p)).collect();
         self.push_polyline_f64(&world, color)
     }
@@ -154,7 +182,12 @@ impl LineSet3D {
     /// Local bounds of all segment endpoints.
     pub fn bbox(&self) -> BBox3 {
         let f = |p: &[f32; 3]| DVec3::from(p.map(f64::from));
-        BBox3::from_points(self.segments.iter().flat_map(|s| [f(&s.a), f(&s.b)]).filter(|p| p.is_finite()))
+        BBox3::from_points(
+            self.segments
+                .iter()
+                .flat_map(|s| [f(&s.a), f(&s.b)])
+                .filter(|p| p.is_finite()),
+        )
     }
 }
 
@@ -227,7 +260,11 @@ impl Default for Grid3D {
 
 /// Clamps highlight ranges to `count` whole primitives (`unit` indices each), drops empty ones and sorts
 /// them by start; overlapping ranges are trimmed so each index is drawn at most once.
-pub(crate) fn normalize_ranges(ranges: &[(Range<u32>, Rgba)], count: u32, unit: u32) -> Vec<(Range<u32>, Rgba)> {
+pub(crate) fn normalize_ranges(
+    ranges: &[(Range<u32>, Rgba)],
+    count: u32,
+    unit: u32,
+) -> Vec<(Range<u32>, Rgba)> {
     let unit = unit.max(1);
     let mut out: Vec<(Range<u32>, Rgba)> = ranges
         .iter()

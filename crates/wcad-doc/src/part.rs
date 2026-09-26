@@ -26,7 +26,10 @@ impl Part {
     }
     /// Features that take part in regeneration (respects rollback, skips suppressed ones).
     pub fn active_features(&self) -> impl Iterator<Item = &Feature> {
-        let end = self.rollback.unwrap_or(self.features.len()).min(self.features.len());
+        let end = self
+            .rollback
+            .unwrap_or(self.features.len())
+            .min(self.features.len());
         self.features[..end].iter().filter(|f| !f.suppressed)
     }
 }
@@ -43,16 +46,61 @@ pub struct Feature {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum FeatureKind {
-    Sketch { plane: PlaneRef, sketch: Sketch },
-    Extrude { profile: ProfileRef, extent: Extent, #[serde(default)] reversed: bool, op: BodyOp },
-    Revolve { profile: ProfileRef, axis: AxisRef, angle: f64, op: BodyOp },
-    Fillet { edges: Vec<EdgeRef>, radius: f64 },
-    Chamfer { edges: Vec<EdgeRef>, distance: f64 },
-    Primitive { shape: Primitive, placement: DAffine3, op: BodyOp },
-    Boolean { target: BodyRef, tools: Vec<BodyRef>, kind: BooleanKind, #[serde(default)] keep_tools: bool },
-    LinearPattern { body: BodyRef, direction: DVec3, count: u32, spacing: f64 },
-    CircularPattern { body: BodyRef, axis: AxisRef, count: u32, angle: f64 },
-    Mirror { body: BodyRef, plane: PlaneRef, #[serde(default = "yes")] join: bool },
+    Sketch {
+        plane: PlaneRef,
+        sketch: Sketch,
+    },
+    Extrude {
+        profile: ProfileRef,
+        extent: Extent,
+        #[serde(default)]
+        reversed: bool,
+        op: BodyOp,
+    },
+    Revolve {
+        profile: ProfileRef,
+        axis: AxisRef,
+        angle: f64,
+        op: BodyOp,
+    },
+    Fillet {
+        edges: Vec<EdgeRef>,
+        radius: f64,
+    },
+    Chamfer {
+        edges: Vec<EdgeRef>,
+        distance: f64,
+    },
+    Primitive {
+        shape: Primitive,
+        placement: DAffine3,
+        op: BodyOp,
+    },
+    Boolean {
+        target: BodyRef,
+        tools: Vec<BodyRef>,
+        kind: BooleanKind,
+        #[serde(default)]
+        keep_tools: bool,
+    },
+    LinearPattern {
+        body: BodyRef,
+        direction: DVec3,
+        count: u32,
+        spacing: f64,
+    },
+    CircularPattern {
+        body: BodyRef,
+        axis: AxisRef,
+        count: u32,
+        angle: f64,
+    },
+    Mirror {
+        body: BodyRef,
+        plane: PlaneRef,
+        #[serde(default = "yes")]
+        join: bool,
+    },
 }
 
 fn yes() -> bool {
@@ -83,9 +131,18 @@ impl FeatureKind {
 pub enum BodyOp {
     NewBody,
     /// Combine with `target` (`None` = the most recently created or modified body).
-    Join { #[serde(default)] target: Option<BodyRef> },
-    Cut { #[serde(default)] target: Option<BodyRef> },
-    Intersect { #[serde(default)] target: Option<BodyRef> },
+    Join {
+        #[serde(default)]
+        target: Option<BodyRef>,
+    },
+    Cut {
+        #[serde(default)]
+        target: Option<BodyRef>,
+    },
+    Intersect {
+        #[serde(default)]
+        target: Option<BodyRef>,
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -112,11 +169,25 @@ pub enum Extent {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum Primitive {
-    Box { size: DVec3 },
-    Cylinder { radius: f64, height: f64 },
-    Sphere { radius: f64 },
-    Cone { radius1: f64, radius2: f64, height: f64 },
-    Torus { major: f64, minor: f64 },
+    Box {
+        size: DVec3,
+    },
+    Cylinder {
+        radius: f64,
+        height: f64,
+    },
+    Sphere {
+        radius: f64,
+    },
+    Cone {
+        radius1: f64,
+        radius2: f64,
+        height: f64,
+    },
+    Torus {
+        major: f64,
+        minor: f64,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -128,7 +199,10 @@ pub enum PlaneRef {
     Xz,
     /// World YZ (Right).
     Yz,
-    Offset { base: Box<PlaneRef>, distance: f64 },
+    Offset {
+        base: Box<PlaneRef>,
+        distance: f64,
+    },
     /// A planar face of a body.
     Face(FaceRef),
 }
@@ -140,7 +214,10 @@ pub enum AxisRef {
     Y,
     Z,
     /// A line of a sketch (typically a construction line).
-    SketchLine { sketch: FeatureId, line: SkEntityId },
+    SketchLine {
+        sketch: FeatureId,
+        line: SkEntityId,
+    },
     Edge(EdgeRef),
 }
 
@@ -165,15 +242,28 @@ pub struct TopoName {
 #[serde(tag = "type")]
 pub enum TopoTag {
     /// Side face swept from a sketch curve (`index` distinguishes pieces of a split curve).
-    Side { entity: SkEntityId, index: u32 },
-    StartCap { region: u32 },
-    EndCap { region: u32 },
+    Side {
+        entity: SkEntityId,
+        index: u32,
+    },
+    StartCap {
+        region: u32,
+    },
+    EndCap {
+        region: u32,
+    },
     /// Face created by a fillet/chamfer feature on its `index`-th edge.
-    Blend { index: u32 },
+    Blend {
+        index: u32,
+    },
     /// Face `index` of a primitive in the kernel's canonical order.
-    PrimitiveFace { index: u32 },
+    PrimitiveFace {
+        index: u32,
+    },
     /// Face produced by a boolean or other op without a better name.
-    Derived { index: u32 },
+    Derived {
+        index: u32,
+    },
 }
 
 /// Geometric fingerprint used when the topological name no longer matches after regeneration.

@@ -22,7 +22,8 @@ impl Skyline {
     pub(crate) fn set_structure(&mut self, first: &[usize]) {
         self.n = first.len();
         self.first.clear();
-        self.first.extend(first.iter().enumerate().map(|(i, &f)| f.min(i)));
+        self.first
+            .extend(first.iter().enumerate().map(|(i, &f)| f.min(i)));
         self.start.clear();
         self.start.reserve(self.n + 1);
         let mut off = 0;

@@ -11,9 +11,10 @@ use acadrust::entities::text::{TextHorizontalAlignment, TextVerticalAlignment};
 use acadrust::entities::{EntityCommon, EntityType};
 use acadrust::types::Vector3;
 use wcad_doc::{
-    Block, BlockId, Color, DimKind, DimStyle, DimStyleId, DocMeta, Document, Drawing, Entity, EntityKind, HAlign,
-    Hatch, HatchLoop, HatchPatternRef, IdAllocator, Insert, Layer, LayerId, LineWeight, Linetype, LinetypeId,
-    LinetypeRef, MText, Part, Text, TextStyle, TextStyleId, VAlign,
+    Block, BlockId, Color, DimKind, DimStyle, DimStyleId, DocMeta, Document, Drawing, Entity,
+    EntityKind, HAlign, Hatch, HatchLoop, HatchPatternRef, IdAllocator, Insert, Layer, LayerId,
+    LineWeight, Linetype, LinetypeId, LinetypeRef, MText, Part, Text, TextStyle, TextStyleId,
+    VAlign,
 };
 use wcad_geom2d::{Arc2, Circle2, Curve2, EllipseArc2, Line2, Nurbs2, PolyVertex, Polyline2};
 use wcad_math::DVec2;
@@ -134,14 +135,28 @@ pub(crate) fn to_document(cad: &CadDocument, flavor: Flavor, extras: &Extras) ->
             cx.drawing.entities.insert(ent.id, ent);
         }
     }
-    let paper: usize =
-        cad.block_records.iter().filter(|br| br.is_paper_space()).map(|br| br.entity_handles.len()).sum();
+    let paper: usize = cad
+        .block_records
+        .iter()
+        .filter(|br| br.is_paper_space())
+        .map(|br| br.entity_handles.len())
+        .sum();
     if paper > 0 {
-        cx.warnings.push(format!("{paper} paper-space entities were not imported (model space only)"));
+        cx.warnings.push(format!(
+            "{paper} paper-space entities were not imported (model space only)"
+        ));
     }
 
-    let Ctx { ids, drawing, warnings, .. } = cx;
-    ImportReport { document: Document::from_parts(meta, drawing, Part::default(), ids), warnings: warnings.finish() }
+    let Ctx {
+        ids,
+        drawing,
+        warnings,
+        ..
+    } = cx;
+    ImportReport {
+        document: Document::from_parts(meta, drawing, Part::default(), ids),
+        warnings: warnings.finish(),
+    }
 }
 
 impl Ctx<'_> {
@@ -153,11 +168,21 @@ impl Ctx<'_> {
             if k == "BYLAYER" || k == "BYBLOCK" || lt.name.is_empty() {
                 continue;
             }
-            let pattern: Vec<f64> = lt.elements.iter().map(|e| e.length).filter(|l| l.is_finite()).collect();
+            let pattern: Vec<f64> = lt
+                .elements
+                .iter()
+                .map(|e| e.length)
+                .filter(|l| l.is_finite())
+                .collect();
             if lt.elements.iter().any(|e| e.complex.is_some()) {
-                self.warnings.count("complex linetype shapes/text were simplified to dashes");
+                self.warnings
+                    .count("complex linetype shapes/text were simplified to dashes");
             }
-            let def = Linetype { name: decode(&lt.name), description: decode(&lt.description), pattern };
+            let def = Linetype {
+                name: decode(&lt.name),
+                description: decode(&lt.description),
+                pattern,
+            };
             match self.linetypes.get(&k) {
                 Some(&id) => {
                     // Keep "Continuous" continuous even if a file defines it oddly.
@@ -189,7 +214,11 @@ impl Ctx<'_> {
             if l.name.is_empty() {
                 continue;
             }
-            let lt = self.linetypes.get(&key(&l.line_type)).copied().unwrap_or_else(|| self.continuous());
+            let lt = self
+                .linetypes
+                .get(&key(&l.line_type))
+                .copied()
+                .unwrap_or_else(|| self.continuous());
             let lineweight = match lineweight_from(l.line_weight) {
                 LineWeight::ByLayer | LineWeight::ByBlock => LineWeight::Default,
                 w => w,
@@ -231,7 +260,11 @@ impl Ctx<'_> {
         self.drawing.tables.layers.insert(
             id,
             Layer {
-                name: if name.is_empty() { "0".into() } else { decode(name) },
+                name: if name.is_empty() {
+                    "0".into()
+                } else {
+                    decode(name)
+                },
                 color: Color::WHITE,
                 linetype: lt,
                 lineweight: LineWeight::Default,
@@ -254,14 +287,28 @@ impl Ctx<'_> {
                 Flavor::Dxf => s.oblique_angle.to_radians(),
                 Flavor::Dwg => s.oblique_angle,
             };
-            let font = if !s.true_type_font.is_empty() { s.true_type_font.clone() } else { s.font_file.clone() };
+            let font = if !s.true_type_font.is_empty() {
+                s.true_type_font.clone()
+            } else {
+                s.font_file.clone()
+            };
             // AutoCAD's generic default shape font maps to our embedded default font.
-            let generic = font.is_empty() || font.eq_ignore_ascii_case("txt") || font.eq_ignore_ascii_case("txt.shx");
+            let generic = font.is_empty()
+                || font.eq_ignore_ascii_case("txt")
+                || font.eq_ignore_ascii_case("txt.shx");
             let def = TextStyle {
                 name: decode(&s.name),
                 font: if generic { "default".into() } else { font },
-                height: if s.height.is_finite() && s.height > 0.0 { s.height } else { 0.0 },
-                width_factor: if s.width_factor.is_finite() && s.width_factor > 0.0 { s.width_factor } else { 1.0 },
+                height: if s.height.is_finite() && s.height > 0.0 {
+                    s.height
+                } else {
+                    0.0
+                },
+                width_factor: if s.width_factor.is_finite() && s.width_factor > 0.0 {
+                    s.width_factor
+                } else {
+                    1.0
+                },
                 oblique: if oblique.is_finite() { oblique } else { 0.0 },
             };
             let k = key(&s.name);
@@ -281,7 +328,10 @@ impl Ctx<'_> {
     }
 
     fn style_id(&self, name: &str) -> TextStyleId {
-        self.styles.get(&key(name)).copied().unwrap_or(self.drawing.tables.current_text_style)
+        self.styles
+            .get(&key(name))
+            .copied()
+            .unwrap_or(self.drawing.tables.current_text_style)
     }
 
     fn import_dim_styles(&mut self) {
@@ -303,9 +353,17 @@ impl Ctx<'_> {
                 ext_offset: pos(d.dimexo, 0.625),
                 ext_extend: pos(d.dimexe, 1.25),
                 text_gap: pos(d.dimgap.abs(), 0.625),
-                scale: if d.dimscale.is_finite() && d.dimscale > 0.0 { d.dimscale } else { 1.0 },
+                scale: if d.dimscale.is_finite() && d.dimscale > 0.0 {
+                    d.dimscale
+                } else {
+                    1.0
+                },
                 decimals,
-                angle_decimals: if d.dimadec < 0 { decimals } else { d.dimadec.clamp(0, 8) as u8 },
+                angle_decimals: if d.dimadec < 0 {
+                    decimals
+                } else {
+                    d.dimadec.clamp(0, 8) as u8
+                },
                 prefix,
                 suffix,
             };
@@ -341,7 +399,8 @@ impl Ctx<'_> {
                 continue;
             }
             if br.flags.is_xref || br.flags.is_xref_overlay {
-                self.warnings.count("external references (xrefs) are not supported");
+                self.warnings
+                    .count("external references (xrefs) are not supported");
                 continue;
             }
             let id = self.ids.block();
@@ -369,7 +428,14 @@ impl Ctx<'_> {
                     entities.insert(ent.id, ent);
                 }
             }
-            self.drawing.blocks.insert(id, Block { name: decode(&br.name), base, entities });
+            self.drawing.blocks.insert(
+                id,
+                Block {
+                    name: decode(&br.name),
+                    base,
+                    entities,
+                },
+            );
         }
     }
 
@@ -385,7 +451,10 @@ impl Ctx<'_> {
             } else if let Some(&id) = self.linetypes.get(&k) {
                 LinetypeRef::Id(id)
             } else {
-                self.warnings.count(format!("unknown linetype '{}' replaced by ByLayer", c.linetype));
+                self.warnings.count(format!(
+                    "unknown linetype '{}' replaced by ByLayer",
+                    c.linetype
+                ));
                 LinetypeRef::ByLayer
             }
         };
@@ -395,7 +464,11 @@ impl Ctx<'_> {
             layer: self.layer_id(&c.layer),
             color: color_from(c.color),
             linetype,
-            linetype_scale: if lts.is_finite() && lts > 0.0 { lts } else { 1.0 },
+            linetype_scale: if lts.is_finite() && lts > 0.0 {
+                lts
+            } else {
+                1.0
+            },
             lineweight: lineweight_from(c.line_weight),
             kind,
         }
@@ -408,7 +481,8 @@ impl Ctx<'_> {
             return false;
         }
         if (n.x / len).abs() > 1e-6 || (n.y / len).abs() > 1e-6 {
-            self.warnings.count("entities outside the XY plane were projected onto it");
+            self.warnings
+                .count("entities outside the XY plane were projected onto it");
         }
         n.z < 0.0
     }
@@ -425,9 +499,16 @@ impl Ctx<'_> {
             return;
         }
         match e {
-            EntityType::Point(p) => self.push(c, EntityKind::Point { p: v2(p.location) }, false, out),
+            EntityType::Point(p) => {
+                self.push(c, EntityKind::Point { p: v2(p.location) }, false, out)
+            }
             EntityType::Line(l) => {
-                self.push(c, EntityKind::Line(Line2::new(v2(l.start), v2(l.end))), false, out);
+                self.push(
+                    c,
+                    EntityKind::Line(Line2::new(v2(l.start), v2(l.end))),
+                    false,
+                    out,
+                );
             }
             EntityType::Circle(ci) => {
                 if !(ci.radius.is_finite() && ci.radius > 0.0) {
@@ -435,7 +516,12 @@ impl Ctx<'_> {
                     return;
                 }
                 let flip = self.ocs_flip(ci.normal);
-                self.push(c, EntityKind::Circle(Circle2::new(v2(ci.center), ci.radius)), flip, out);
+                self.push(
+                    c,
+                    EntityKind::Circle(Circle2::new(v2(ci.center), ci.radius)),
+                    flip,
+                    out,
+                );
             }
             EntityType::Arc(a) => {
                 if !(a.radius.is_finite() && a.radius > 0.0) {
@@ -459,46 +545,91 @@ impl Ctx<'_> {
                     (start, end) = (-end, -start);
                 }
                 let ratio = el.minor_axis_ratio.min(1.0);
-                let e2 = EllipseArc2 { c: v2(el.center), major, ratio, start, end };
+                let e2 = EllipseArc2 {
+                    c: v2(el.center),
+                    major,
+                    ratio,
+                    start,
+                    end,
+                };
                 self.push(c, EntityKind::Ellipse(e2), false, out);
             }
             EntityType::LwPolyline(p) => {
                 let verts: Vec<PolyVertex> = p
                     .vertices
                     .iter()
-                    .map(|v| PolyVertex::with_bulge(v2d(v.location), if v.bulge.is_finite() { v.bulge } else { 0.0 }))
+                    .map(|v| {
+                        PolyVertex::with_bulge(
+                            v2d(v.location),
+                            if v.bulge.is_finite() { v.bulge } else { 0.0 },
+                        )
+                    })
                     .collect();
                 if verts.is_empty() {
                     return;
                 }
                 let flip = self.ocs_flip(p.normal);
-                self.push(c, EntityKind::Polyline(Polyline2 { verts, closed: p.is_closed }), flip, out);
+                self.push(
+                    c,
+                    EntityKind::Polyline(Polyline2 {
+                        verts,
+                        closed: p.is_closed,
+                    }),
+                    flip,
+                    out,
+                );
             }
             EntityType::Polyline2D(p) => {
                 let verts: Vec<PolyVertex> = p
                     .vertices
                     .iter()
                     .filter(|v| v.flags.bits() & 16 == 0) // skip spline frame control points
-                    .map(|v| PolyVertex::with_bulge(v2(v.location), if v.bulge.is_finite() { v.bulge } else { 0.0 }))
+                    .map(|v| {
+                        PolyVertex::with_bulge(
+                            v2(v.location),
+                            if v.bulge.is_finite() { v.bulge } else { 0.0 },
+                        )
+                    })
                     .collect();
                 if verts.is_empty() {
                     return;
                 }
                 let flip = self.ocs_flip(p.normal);
-                self.push(c, EntityKind::Polyline(Polyline2 { verts, closed: p.is_closed() }), flip, out);
+                self.push(
+                    c,
+                    EntityKind::Polyline(Polyline2 {
+                        verts,
+                        closed: p.is_closed(),
+                    }),
+                    flip,
+                    out,
+                );
             }
             EntityType::Polyline3D(p) => {
                 if p.flags.is_3d_mesh || p.flags.is_polyface_mesh {
                     self.warnings.count("polygon meshes are not supported");
                     return;
                 }
-                let verts: Vec<PolyVertex> =
-                    p.vertices.iter().filter(|v| v.flags & 16 == 0).map(|v| PolyVertex::new(v2(v.position))).collect();
+                let verts: Vec<PolyVertex> = p
+                    .vertices
+                    .iter()
+                    .filter(|v| v.flags & 16 == 0)
+                    .map(|v| PolyVertex::new(v2(v.position)))
+                    .collect();
                 if verts.is_empty() {
                     return;
                 }
-                self.warnings.count("3D polylines were projected onto the XY plane");
-                self.push(c, EntityKind::Polyline(Polyline2 { verts, closed: p.flags.closed }), false, out);
+                self.warnings
+                    .count("3D polylines were projected onto the XY plane");
+                self.push(
+                    c,
+                    EntityKind::Polyline(Polyline2 {
+                        verts,
+                        closed: p.flags.closed,
+                    }),
+                    false,
+                    out,
+                );
             }
             EntityType::Polyline(p) => {
                 let verts: Vec<PolyVertex> = p
@@ -510,15 +641,28 @@ impl Ctx<'_> {
                 if verts.is_empty() {
                     return;
                 }
-                self.warnings.count("3D polylines were projected onto the XY plane");
-                self.push(c, EntityKind::Polyline(Polyline2 { verts, closed: p.is_closed() }), false, out);
+                self.warnings
+                    .count("3D polylines were projected onto the XY plane");
+                self.push(
+                    c,
+                    EntityKind::Polyline(Polyline2 {
+                        verts,
+                        closed: p.is_closed(),
+                    }),
+                    false,
+                    out,
+                );
             }
             EntityType::Spline(s) => {
                 let rational = s.flags.rational && s.weights.len() == s.control_points.len();
                 let n = Nurbs2 {
                     degree: s.degree.clamp(1, 32) as u32,
                     ctrl: s.control_points.iter().map(|p| v2(*p)).collect(),
-                    weights: if rational { s.weights.clone() } else { Vec::new() },
+                    weights: if rational {
+                        s.weights.clone()
+                    } else {
+                        Vec::new()
+                    },
                     knots: s.knots.clone(),
                     fit_points: s.fit_points.iter().map(|p| v2(*p)).collect(),
                     closed: s.flags.closed || s.flags.periodic,
@@ -530,7 +674,8 @@ impl Ctx<'_> {
                 self.push(c, EntityKind::Spline(n), false, out);
             }
             EntityType::Text(t) => {
-                let (halign, valign, fit) = text_align(&t.horizontal_alignment, &t.vertical_alignment);
+                let (halign, valign, fit) =
+                    text_align(&t.horizontal_alignment, &t.vertical_alignment);
                 let left_baseline = halign == HAlign::Left && valign == VAlign::Baseline && !fit;
                 let pos = if left_baseline {
                     v2(t.insertion_point)
@@ -589,13 +734,17 @@ impl Ctx<'_> {
                     }
                 }
                 if loops.is_empty() {
-                    self.warnings.count("hatches without usable boundaries skipped");
+                    self.warnings
+                        .count("hatches without usable boundaries skipped");
                     return;
                 }
                 if h.gradient_color.enabled {
-                    self.warnings.count("gradient fills were imported as solid fills");
+                    self.warnings
+                        .count("gradient fills were imported as solid fills");
                 }
-                let solid = h.is_solid || h.gradient_color.enabled || h.pattern.name.eq_ignore_ascii_case("SOLID");
+                let solid = h.is_solid
+                    || h.gradient_color.enabled
+                    || h.pattern.name.eq_ignore_ascii_case("SOLID");
                 let pattern = HatchPatternRef {
                     name: if solid {
                         "SOLID".into()
@@ -610,14 +759,20 @@ impl Ctx<'_> {
                 self.push(c, EntityKind::Hatch(Hatch { loops, pattern }), flip, out);
             }
             EntityType::Solid(s) => {
-                let pts = [v2(s.first_corner), v2(s.second_corner), v2(s.fourth_corner), v2(s.third_corner)];
+                let pts = [
+                    v2(s.first_corner),
+                    v2(s.second_corner),
+                    v2(s.fourth_corner),
+                    v2(s.third_corner),
+                ];
                 let mut verts: Vec<PolyVertex> = Vec::new();
                 for p in pts {
                     if verts.last().is_none_or(|v| v.p.distance_squared(p) > 1e-24) {
                         verts.push(PolyVertex::new(p));
                     }
                 }
-                if verts.len() > 3 && verts[0].p.distance_squared(verts[verts.len() - 1].p) <= 1e-24 {
+                if verts.len() > 3 && verts[0].p.distance_squared(verts[verts.len() - 1].p) <= 1e-24
+                {
                     verts.pop();
                 }
                 if verts.len() < 3 {
@@ -625,23 +780,48 @@ impl Ctx<'_> {
                 }
                 let flip = self.ocs_flip(s.normal);
                 let hatch = Hatch {
-                    loops: vec![HatchLoop { curves: vec![Curve2::Polyline(Polyline2 { verts, closed: true })] }],
-                    pattern: HatchPatternRef { name: "SOLID".into(), angle: 0.0, scale: 1.0 },
+                    loops: vec![HatchLoop {
+                        curves: vec![Curve2::Polyline(Polyline2 {
+                            verts,
+                            closed: true,
+                        })],
+                    }],
+                    pattern: HatchPatternRef {
+                        name: "SOLID".into(),
+                        angle: 0.0,
+                        scale: 1.0,
+                    },
                 };
                 self.push(c, EntityKind::Hatch(hatch), flip, out);
             }
             EntityType::Leader(l) => {
-                let verts: Vec<PolyVertex> = l.vertices.iter().map(|p| PolyVertex::new(v2(*p))).collect();
+                let verts: Vec<PolyVertex> =
+                    l.vertices.iter().map(|p| PolyVertex::new(v2(*p))).collect();
                 if verts.len() >= 2 {
                     self.warnings.count("leaders were imported as polylines");
-                    self.push(c, EntityKind::Polyline(Polyline2 { verts, closed: false }), false, out);
+                    self.push(
+                        c,
+                        EntityKind::Polyline(Polyline2 {
+                            verts,
+                            closed: false,
+                        }),
+                        false,
+                        out,
+                    );
                 }
             }
             EntityType::Insert(ins) => self.map_insert(c, ins, out),
             EntityType::AttributeDefinition(_) => {} // template only; values come with INSERTs
-            EntityType::Block(_) | EntityType::BlockEnd(_) | EntityType::Seqend(_) | EntityType::Viewport(_) => {}
-            EntityType::Unknown(u) => self.warnings.count(format!("unsupported entity {} skipped", u.dxf_name)),
-            other => self.warnings.count(format!("unsupported entity {} skipped", entity_name(other))),
+            EntityType::Block(_)
+            | EntityType::BlockEnd(_)
+            | EntityType::Seqend(_)
+            | EntityType::Viewport(_) => {}
+            EntityType::Unknown(u) => self
+                .warnings
+                .count(format!("unsupported entity {} skipped", u.dxf_name)),
+            other => self
+                .warnings
+                .count(format!("unsupported entity {} skipped", entity_name(other))),
         }
     }
 
@@ -649,24 +829,47 @@ impl Ctx<'_> {
         if h.is_finite() && h > 0.0 {
             return h;
         }
-        self.drawing.tables.text_styles.get(&style).map(|s| s.height).filter(|h| *h > 0.0).unwrap_or(2.5)
+        self.drawing
+            .tables
+            .text_styles
+            .get(&style)
+            .map(|s| s.height)
+            .filter(|h| *h > 0.0)
+            .unwrap_or(2.5)
     }
 
-    fn map_insert(&mut self, c: &EntityCommon, ins: &acadrust::entities::Insert, out: &mut Vec<Entity>) {
+    fn map_insert(
+        &mut self,
+        c: &EntityCommon,
+        ins: &acadrust::entities::Insert,
+        out: &mut Vec<Entity>,
+    ) {
         let Some(&block) = self.blocks.get(&key(&ins.block_name)) else {
             if !is_dimension_block(&key(&ins.block_name)) {
-                self.warnings.count(format!("reference to missing block '{}' skipped", ins.block_name));
+                self.warnings.count(format!(
+                    "reference to missing block '{}' skipped",
+                    ins.block_name
+                ));
             }
             return;
         };
         let flip = self.ocs_flip(ins.normal);
-        let sx = if ins.x_scale().is_finite() && ins.x_scale() != 0.0 { ins.x_scale() } else { 1.0 };
-        let sy = if ins.y_scale().is_finite() && ins.y_scale() != 0.0 { ins.y_scale() } else { 1.0 };
+        let sx = if ins.x_scale().is_finite() && ins.x_scale() != 0.0 {
+            ins.x_scale()
+        } else {
+            1.0
+        };
+        let sy = if ins.y_scale().is_finite() && ins.y_scale() != 0.0 {
+            ins.y_scale()
+        } else {
+            1.0
+        };
         let rotation = finite_or(ins.rotation, 0.0);
         let cols = ins.column_count.max(1) as usize;
         let rows = ins.row_count.max(1) as usize;
         if cols * rows > 10_000 {
-            self.warnings.count("very large block arrays (MINSERT) were truncated");
+            self.warnings
+                .count("very large block arrays (MINSERT) were truncated");
         }
         let (sin, cos) = rotation.sin_cos();
         let mut n = 0usize;
@@ -737,14 +940,22 @@ impl Ctx<'_> {
                 line_point: v2(l.definition_point),
                 rotation: finite_or(l.rotation, 0.0),
             },
-            ADim::Aligned(a) => {
-                DimKind::Aligned { p1: v2(a.first_point), p2: v2(a.second_point), line_point: v2(a.definition_point) }
-            }
-            ADim::Radius(r) => DimKind::Radius { center: v2(r.angle_vertex), point: v2(r.definition_point) },
+            ADim::Aligned(a) => DimKind::Aligned {
+                p1: v2(a.first_point),
+                p2: v2(a.second_point),
+                line_point: v2(a.definition_point),
+            },
+            ADim::Radius(r) => DimKind::Radius {
+                center: v2(r.angle_vertex),
+                point: v2(r.definition_point),
+            },
             ADim::Diameter(dd) => {
                 let a = v2(dd.angle_vertex);
                 let b = v2(dd.definition_point);
-                DimKind::Diameter { center: (a + b) * 0.5, point: a }
+                DimKind::Diameter {
+                    center: (a + b) * 0.5,
+                    point: a,
+                }
             }
             ADim::Angular3Pt(a) => DimKind::Angular {
                 vertex: v2(a.angle_vertex),
@@ -758,16 +969,23 @@ impl Ctx<'_> {
                 let (s2, e2) = (v2(a.angle_vertex), v2(a.definition_point));
                 let arc = v2(a.dimension_arc);
                 let Some(vertex) = line_line(s1, e1, s2, e2) else {
-                    self.warnings.count("parallel-line angular dimensions skipped");
+                    self.warnings
+                        .count("parallel-line angular dimensions skipped");
                     return;
                 };
-                let far =
-                    |a: DVec2, b: DVec2| if a.distance_squared(vertex) > b.distance_squared(vertex) { a } else { b };
+                let far = |a: DVec2, b: DVec2| {
+                    if a.distance_squared(vertex) > b.distance_squared(vertex) {
+                        a
+                    } else {
+                        b
+                    }
+                };
                 let (mut p1, mut p2) = (far(s1, e1), far(s2, e2));
                 // Choose the rays whose sector contains the arc point.
                 let ang = |p: DVec2| (p - vertex).y.atan2((p - vertex).x);
                 let inside = |a: DVec2, b: DVec2| {
-                    wcad_math::ccw_between(ang(a), ang(b), ang(arc), 1e-9) && wcad_math::ccw_sweep(ang(a), ang(b)) <= PI
+                    wcad_math::ccw_between(ang(a), ang(b), ang(arc), 1e-9)
+                        && wcad_math::ccw_sweep(ang(a), ang(b)) <= PI
                 };
                 let mut found = false;
                 'search: for flip1 in [false, true] {
@@ -787,7 +1005,12 @@ impl Ctx<'_> {
                 if !found {
                     self.warnings.count("angular dimension sector guessed");
                 }
-                DimKind::Angular { vertex, p1, p2, arc_point: arc }
+                DimKind::Angular {
+                    vertex,
+                    p1,
+                    p2,
+                    arc_point: arc,
+                }
             }
             ADim::Ordinate(o) => DimKind::Ordinate {
                 origin: v2(o.definition_point),
@@ -796,20 +1019,34 @@ impl Ctx<'_> {
                 x_axis: o.is_ordinate_type_x,
             },
             ADim::Arc(_) => {
-                self.warnings.count("unsupported entity ARC_DIMENSION skipped");
+                self.warnings
+                    .count("unsupported entity ARC_DIMENSION skipped");
                 return;
             }
             ADim::LargeRadial(_) => {
-                self.warnings.count("unsupported jogged radius dimension skipped");
+                self.warnings
+                    .count("unsupported jogged radius dimension skipped");
                 return;
             }
         };
-        let style =
-            self.dimstyles.get(&key(&base.style_name)).copied().unwrap_or(self.drawing.tables.current_dim_style);
-        let text_override =
-            base.text_override().filter(|t| !t.is_empty() && *t != "<>").map(crate::mtext::decode_unicode_escapes);
-        let text_pos = base.text_user_positioned.then(|| v2(base.text_middle_point));
-        let dim = wcad_doc::Dimension { kind, style, text_override, text_pos };
+        let style = self
+            .dimstyles
+            .get(&key(&base.style_name))
+            .copied()
+            .unwrap_or(self.drawing.tables.current_dim_style);
+        let text_override = base
+            .text_override()
+            .filter(|t| !t.is_empty() && *t != "<>")
+            .map(crate::mtext::decode_unicode_escapes);
+        let text_pos = base
+            .text_user_positioned
+            .then(|| v2(base.text_middle_point));
+        let dim = wcad_doc::Dimension {
+            kind,
+            style,
+            text_override,
+            text_pos,
+        };
         self.push(c, EntityKind::Dimension(dim), false, out);
     }
 
@@ -821,19 +1058,32 @@ impl Ctx<'_> {
                     let verts: Vec<PolyVertex> = p
                         .vertices
                         .iter()
-                        .map(|v| PolyVertex::with_bulge(DVec2::new(v.x, v.y), if v.z.is_finite() { v.z } else { 0.0 }))
+                        .map(|v| {
+                            PolyVertex::with_bulge(
+                                DVec2::new(v.x, v.y),
+                                if v.z.is_finite() { v.z } else { 0.0 },
+                            )
+                        })
                         .collect();
                     if verts.len() >= 2 {
-                        curves.push(Curve2::Polyline(Polyline2 { verts, closed: true }));
+                        curves.push(Curve2::Polyline(Polyline2 {
+                            verts,
+                            closed: true,
+                        }));
                     }
                 }
-                BoundaryEdge::Line(l) => curves.push(Curve2::Line(Line2::new(v2d(l.start), v2d(l.end)))),
+                BoundaryEdge::Line(l) => {
+                    curves.push(Curve2::Line(Line2::new(v2d(l.start), v2d(l.end))))
+                }
                 BoundaryEdge::CircularArc(a) => {
                     if !(a.radius > 0.0) {
                         continue;
                     }
-                    let (s, e) =
-                        if a.counter_clockwise { (a.start_angle, a.end_angle) } else { (-a.end_angle, -a.start_angle) };
+                    let (s, e) = if a.counter_clockwise {
+                        (a.start_angle, a.end_angle)
+                    } else {
+                        (-a.end_angle, -a.start_angle)
+                    };
                     if (e - s).abs() >= TAU - 1e-9 {
                         curves.push(Curve2::Circle(Circle2::new(v2d(a.center), a.radius)));
                     } else {
@@ -857,7 +1107,10 @@ impl Ctx<'_> {
                     let (s, e) = if full {
                         (0.0, TAU)
                     } else {
-                        (super::ellipse_angle_to_param(ratio, s), super::ellipse_angle_to_param(ratio, e))
+                        (
+                            super::ellipse_angle_to_param(ratio, s),
+                            super::ellipse_angle_to_param(ratio, e),
+                        )
                     };
                     curves.push(Curve2::Ellipse(EllipseArc2 {
                         c: v2d(el.center),
@@ -870,8 +1123,16 @@ impl Ctx<'_> {
                 BoundaryEdge::Spline(sp) => {
                     let n = Nurbs2 {
                         degree: sp.degree.clamp(1, 32) as u32,
-                        ctrl: sp.control_points.iter().map(|p| DVec2::new(p.x, p.y)).collect(),
-                        weights: if sp.rational { sp.control_points.iter().map(|p| p.z).collect() } else { Vec::new() },
+                        ctrl: sp
+                            .control_points
+                            .iter()
+                            .map(|p| DVec2::new(p.x, p.y))
+                            .collect(),
+                        weights: if sp.rational {
+                            sp.control_points.iter().map(|p| p.z).collect()
+                        } else {
+                            Vec::new()
+                        },
                         knots: sp.knots.clone(),
                         fit_points: sp.fit_points.iter().map(|p| v2d(*p)).collect(),
                         closed: sp.periodic,
@@ -885,7 +1146,9 @@ impl Ctx<'_> {
 }
 
 fn is_dimension_block(upper: &str) -> bool {
-    upper.strip_prefix("*D").is_some_and(|rest| !rest.is_empty() && rest.bytes().all(|b| b.is_ascii_digit()))
+    upper
+        .strip_prefix("*D")
+        .is_some_and(|rest| !rest.is_empty() && rest.bytes().all(|b| b.is_ascii_digit()))
 }
 
 fn finite_or(v: f64, d: f64) -> f64 {
@@ -909,7 +1172,9 @@ fn text_align(h: &TextHorizontalAlignment, v: &TextVerticalAlignment) -> (HAlign
         TextHorizontalAlignment::Center => (HAlign::Center, valign, false),
         TextHorizontalAlignment::Right => (HAlign::Right, valign, false),
         TextHorizontalAlignment::Middle => (HAlign::Center, VAlign::Middle, false),
-        TextHorizontalAlignment::Aligned | TextHorizontalAlignment::Fit => (HAlign::Left, VAlign::Baseline, true),
+        TextHorizontalAlignment::Aligned | TextHorizontalAlignment::Fit => {
+            (HAlign::Left, VAlign::Baseline, true)
+        }
     }
 }
 
@@ -970,11 +1235,19 @@ fn mirror_curve(c: Curve2) -> Curve2 {
         Curve2::Line(l) => Curve2::Line(Line2::new(m(l.a), m(l.b))),
         Curve2::Circle(ci) => Curve2::Circle(Circle2::new(m(ci.c), ci.r)),
         Curve2::Arc(a) => Curve2::Arc(Arc2::new(m(a.c), a.r, PI - a.end, PI - a.start)),
-        Curve2::Ellipse(e) => {
-            Curve2::Ellipse(EllipseArc2 { c: m(e.c), major: m(e.major), ratio: e.ratio, start: -e.end, end: -e.start })
-        }
+        Curve2::Ellipse(e) => Curve2::Ellipse(EllipseArc2 {
+            c: m(e.c),
+            major: m(e.major),
+            ratio: e.ratio,
+            start: -e.end,
+            end: -e.start,
+        }),
         Curve2::Polyline(p) => Curve2::Polyline(Polyline2 {
-            verts: p.verts.iter().map(|v| PolyVertex::with_bulge(m(v.p), -v.bulge)).collect(),
+            verts: p
+                .verts
+                .iter()
+                .map(|v| PolyVertex::with_bulge(m(v.p), -v.bulge))
+                .collect(),
             closed: p.closed,
         }),
         Curve2::Spline(mut s) => {

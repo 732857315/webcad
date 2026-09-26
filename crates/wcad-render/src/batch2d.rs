@@ -75,7 +75,10 @@ pub struct Batch2D {
 
 impl Batch2D {
     pub fn new(origin: DVec2) -> Self {
-        Self { origin, ..Default::default() }
+        Self {
+            origin,
+            ..Default::default()
+        }
     }
 
     /// World point → batch-local `f32`.
@@ -102,7 +105,14 @@ impl Batch2D {
     }
 
     /// Adds a segment with a color gradient from `a` to `b`.
-    pub fn push_line_colors(&mut self, a: DVec2, b: DVec2, width_px: f32, color_a: Rgba, color_b: Rgba) {
+    pub fn push_line_colors(
+        &mut self,
+        a: DVec2,
+        b: DVec2,
+        width_px: f32,
+        color_a: Rgba,
+        color_b: Rgba,
+    ) {
         if !a.is_finite() || !b.is_finite() {
             return;
         }
@@ -154,7 +164,11 @@ impl Batch2D {
         }
         let n = pattern.len();
         let (mut idx, mut remaining) = (0usize, pattern[0].abs());
-        let mut ph = if phase.is_finite() { phase.rem_euclid(total) } else { 0.0 };
+        let mut ph = if phase.is_finite() {
+            phase.rem_euclid(total)
+        } else {
+            0.0
+        };
         while ph > 0.0 {
             if ph < remaining {
                 remaining -= ph;
@@ -210,9 +224,13 @@ impl Batch2D {
         let base = self.fill_vertices.len() as u32;
         let color = pack_rgba(color);
         for p in [a, b, c] {
-            self.fill_vertices.push(FillVertex { pos: self.local(p), color });
+            self.fill_vertices.push(FillVertex {
+                pos: self.local(p),
+                color,
+            });
         }
-        self.fill_indices.extend_from_slice(&[base, base + 1, base + 2]);
+        self.fill_indices
+            .extend_from_slice(&[base, base + 1, base + 2]);
     }
 
     /// Adds an indexed triangle list (e.g. from lyon) with one color. Triangles referencing vertices
@@ -221,7 +239,11 @@ impl Batch2D {
         let base = self.fill_vertices.len() as u32;
         let color = pack_rgba(color);
         for &p in verts {
-            let pos = if p.is_finite() { self.local(p) } else { [0.0; 2] };
+            let pos = if p.is_finite() {
+                self.local(p)
+            } else {
+                [0.0; 2]
+            };
             self.fill_vertices.push(FillVertex { pos, color });
         }
         let n = verts.len() as u32;
@@ -237,7 +259,9 @@ impl Batch2D {
         if pts.len() < 3 {
             return;
         }
-        let indices: Vec<u32> = (1..pts.len() as u32 - 1).flat_map(|i| [0, i, i + 1]).collect();
+        let indices: Vec<u32> = (1..pts.len() as u32 - 1)
+            .flat_map(|i| [0, i, i + 1])
+            .collect();
         self.push_triangles(pts, &indices, color);
     }
 
@@ -249,7 +273,11 @@ impl Batch2D {
         self.points.push(PointMarker {
             pos: self.local(p),
             color: pack_rgba(color),
-            size: if size_px.is_finite() { size_px.max(0.0) } else { 5.0 },
+            size: if size_px.is_finite() {
+                size_px.max(0.0)
+            } else {
+                5.0
+            },
             shape: shape as u32,
         });
     }

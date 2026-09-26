@@ -9,7 +9,9 @@ use wgpu::util::DeviceExt as _;
 
 use crate::batch2d::{Batch2D, FillVertex, LineSegment2D, PointMarker};
 use crate::camera::{Camera2D, Camera3D};
-use crate::scene3d::{Grid3D, LineSegment3D, LineSet3D, LineStyle3D, MeshData, MeshStyle, normalize_ranges};
+use crate::scene3d::{
+    Grid3D, LineSegment3D, LineSet3D, LineStyle3D, MeshData, MeshStyle, normalize_ranges,
+};
 use crate::viewport::{COLOR_FORMAT, DEPTH_FORMAT, Viewport};
 use crate::{Rgba, shader_modules};
 
@@ -37,7 +39,10 @@ pub struct Batch2DStyle {
 
 impl Default for Batch2DStyle {
     fn default() -> Self {
-        Self { color: None, opacity: 1.0 }
+        Self {
+            color: None,
+            opacity: 1.0,
+        }
     }
 }
 
@@ -52,7 +57,10 @@ pub struct Frame2D {
 
 impl Default for Frame2D {
     fn default() -> Self {
-        Self { background: [0.13, 0.14, 0.16, 1.0], pixel_scale: 1.0 }
+        Self {
+            background: [0.13, 0.14, 0.16, 1.0],
+            pixel_scale: 1.0,
+        }
     }
 }
 
@@ -148,7 +156,10 @@ struct UniformArena {
 
 impl UniformArena {
     fn new(stride: usize) -> Self {
-        Self { data: Vec::with_capacity(stride * 16), stride }
+        Self {
+            data: Vec::with_capacity(stride * 16),
+            stride,
+        }
     }
 
     fn push<T: bytemuck::Pod>(&mut self, v: &T) -> u32 {
@@ -166,7 +177,12 @@ fn mat_f32(m: &DMat4) -> [[f32; 4]; 4] {
 fn premultiplied_clear(c: Rgba) -> wgpu::Color {
     let a = c[3].clamp(0.0, 1.0) as f64;
     let ch = |v: f32| (v.clamp(0.0, 1.0) as f64) * a;
-    wgpu::Color { r: ch(c[0]), g: ch(c[1]), b: ch(c[2]), a }
+    wgpu::Color {
+        r: ch(c[0]),
+        g: ch(c[1]),
+        b: ch(c[2]),
+        a,
+    }
 }
 
 fn finite_or(v: f32, d: f32) -> f32 {
@@ -238,12 +254,13 @@ struct Pipelines {
     line3d_top: wgpu::RenderPipeline,
 }
 
-const FILL_ATTRS: [wgpu::VertexAttribute; 2] = wgpu::vertex_attr_array![0 => Float32x2, 1 => Unorm8x4];
-const LINE2D_ATTRS: [wgpu::VertexAttribute; 5] =
-    wgpu::vertex_attr_array![0 => Float32x2, 1 => Float32x2, 2 => Unorm8x4, 3 => Unorm8x4, 4 => Float32];
+const FILL_ATTRS: [wgpu::VertexAttribute; 2] =
+    wgpu::vertex_attr_array![0 => Float32x2, 1 => Unorm8x4];
+const LINE2D_ATTRS: [wgpu::VertexAttribute; 5] = wgpu::vertex_attr_array![0 => Float32x2, 1 => Float32x2, 2 => Unorm8x4, 3 => Unorm8x4, 4 => Float32];
 const POINT_ATTRS: [wgpu::VertexAttribute; 4] =
     wgpu::vertex_attr_array![0 => Float32x2, 1 => Unorm8x4, 2 => Float32, 3 => Uint32];
-const MESH_ATTRS: [wgpu::VertexAttribute; 2] = wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3];
+const MESH_ATTRS: [wgpu::VertexAttribute; 2] =
+    wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3];
 const LINE3D_ATTRS: [wgpu::VertexAttribute; 4] =
     wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3, 2 => Unorm8x4, 3 => Unorm8x4];
 
@@ -258,8 +275,16 @@ const AMBIENT_GROUND: [f32; 3] = [0.14, 0.13, 0.12];
 
 /// A queued 3D draw, recorded while building uniforms and replayed inside the pass.
 enum Draw3D<'a> {
-    Mesh { bufs: &'a (wgpu::Buffer, wgpu::Buffer), range: Range<u32>, offset: u32 },
-    Lines { buf: &'a wgpu::Buffer, range: Range<u32>, offset: u32 },
+    Mesh {
+        bufs: &'a (wgpu::Buffer, wgpu::Buffer),
+        range: Range<u32>,
+        offset: u32,
+    },
+    Lines {
+        buf: &'a wgpu::Buffer,
+        range: Range<u32>,
+        offset: u32,
+    },
 }
 
 /// GPU renderer for 2D batches and 3D meshes/lines. Create once per device.
@@ -357,14 +382,20 @@ impl Renderer {
             return None;
         }
         if bytes.len() as u64 > self.device.limits().max_buffer_size {
-            log::warn!("wcad-render: {label} is {} bytes, larger than the device limit; not drawn", bytes.len());
+            log::warn!(
+                "wcad-render: {label} is {} bytes, larger than the device limit; not drawn",
+                bytes.len()
+            );
             return None;
         }
-        Some(self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some(label),
-            contents: bytes,
-            usage,
-        }))
+        Some(
+            self.device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some(label),
+                    contents: bytes,
+                    usage,
+                }),
+        )
     }
 
     fn make_batch2d(&self, batch: &Batch2D) -> GpuBatch2D {
@@ -375,21 +406,42 @@ impl Renderer {
             .as_chunks::<3>()
             .0
             .iter()
-            .flat_map(|t| if t.iter().all(|&i| i < nv) { [t[0], t[1], t[2]] } else { [0, 0, 0] })
+            .flat_map(|t| {
+                if t.iter().all(|&i| i < nv) {
+                    [t[0], t[1], t[2]]
+                } else {
+                    [0, 0, 0]
+                }
+            })
             .collect();
         let fills = if nv > 0 && !idx.is_empty() {
-            let vb =
-                self.buffer("wcad_fill_vb", bytemuck::cast_slice(&batch.fill_vertices), wgpu::BufferUsages::VERTEX);
-            let ib = self.buffer("wcad_fill_ib", bytemuck::cast_slice(&idx), wgpu::BufferUsages::INDEX);
+            let vb = self.buffer(
+                "wcad_fill_vb",
+                bytemuck::cast_slice(&batch.fill_vertices),
+                wgpu::BufferUsages::VERTEX,
+            );
+            let ib = self.buffer(
+                "wcad_fill_ib",
+                bytemuck::cast_slice(&idx),
+                wgpu::BufferUsages::INDEX,
+            );
             vb.zip(ib).map(|(vb, ib)| (vb, ib, idx.len() as u32))
         } else {
             None
         };
         let lines = self
-            .buffer("wcad_lines2d", bytemuck::cast_slice(&batch.lines), wgpu::BufferUsages::VERTEX)
+            .buffer(
+                "wcad_lines2d",
+                bytemuck::cast_slice(&batch.lines),
+                wgpu::BufferUsages::VERTEX,
+            )
             .map(|b| (b, batch.lines.len() as u32));
         let points = self
-            .buffer("wcad_points2d", bytemuck::cast_slice(&batch.points), wgpu::BufferUsages::VERTEX)
+            .buffer(
+                "wcad_points2d",
+                bytemuck::cast_slice(&batch.points),
+                wgpu::BufferUsages::VERTEX,
+            )
             .map(|b| (b, batch.points.len() as u32));
         GpuBatch2D {
             origin: batch.origin,
@@ -403,9 +455,22 @@ impl Renderer {
     }
 
     fn make_lines(&self, set: &LineSet3D, style: LineStyle3D) -> GpuLines {
-        let buffer = self.buffer("wcad_lines3d", bytemuck::cast_slice(&set.segments), wgpu::BufferUsages::VERTEX);
-        let count = if buffer.is_some() { set.segments.len() as u32 } else { 0 };
-        GpuLines { buffer, count, bbox: set.bbox(), style }
+        let buffer = self.buffer(
+            "wcad_lines3d",
+            bytemuck::cast_slice(&set.segments),
+            wgpu::BufferUsages::VERTEX,
+        );
+        let count = if buffer.is_some() {
+            set.segments.len() as u32
+        } else {
+            0
+        };
+        GpuLines {
+            buffer,
+            count,
+            bbox: set.bbox(),
+            style,
+        }
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -479,7 +544,10 @@ impl Renderer {
 
     /// Bounds of all visible batches (for "zoom extents").
     pub fn scene_bbox_2d(&self) -> BBox2 {
-        self.batches.values().filter(|b| b.visible).fold(BBox2::EMPTY, |acc, b| acc.union(&b.bbox))
+        self.batches
+            .values()
+            .filter(|b| b.visible)
+            .fold(BBox2::EMPTY, |acc, b| acc.union(&b.bbox))
     }
 
     /// Changes whenever the 2D content changes.
@@ -491,7 +559,10 @@ impl Renderer {
         let mut h = std::collections::hash_map::DefaultHasher::new();
         "2d".hash(&mut h);
         (vp.uid(), vp.generation(), self.rev2d).hash(&mut h);
-        hash_f64(&mut h, &[cam.center.x, cam.center.y, cam.px_per_unit, cam.rotation]);
+        hash_f64(
+            &mut h,
+            &[cam.center.x, cam.center.y, cam.px_per_unit, cam.rotation],
+        );
         hash_f32(&mut h, &frame.background);
         hash_f32(&mut h, &[frame.pixel_scale]);
         h.finish()
@@ -517,12 +588,21 @@ impl Renderer {
         let size = vp.size_f64();
         let pixel_scale = finite_or(frame.pixel_scale, 1.0).clamp(0.01, 100.0);
         // Culling rectangle with a generous margin for line widths and markers.
-        let visible = cam.visible_bbox(size).expanded(cam.px_to_units(64.0 * pixel_scale as f64));
+        let visible = cam
+            .visible_bbox(size)
+            .expanded(cam.px_to_units(64.0 * pixel_scale as f64));
 
         let mut u = UniformArena::new(self.stride);
-        u.push(&Frame2DU { viewport: [size.x as f32, size.y as f32, pixel_scale, 0.0] });
+        u.push(&Frame2DU {
+            viewport: [size.x as f32, size.y as f32, pixel_scale, 0.0],
+        });
         let mut draws: Vec<(&GpuBatch2D, u32)> = Vec::new();
-        for b in self.batches.values().filter(|b| b.visible).chain(self.overlay2d.iter()) {
+        for b in self
+            .batches
+            .values()
+            .filter(|b| b.visible)
+            .chain(self.overlay2d.iter())
+        {
             if b.bbox.is_empty() || !b.bbox.intersects(&visible) {
                 continue;
             }
@@ -536,7 +616,12 @@ impl Renderer {
                 m,
                 t: [t[0], t[1], 0.0, 0.0],
                 color: st.color.unwrap_or([0.0; 4]),
-                flags: [if st.color.is_some() { 1.0 } else { 0.0 }, opacity, 0.0, 0.0],
+                flags: [
+                    if st.color.is_some() { 1.0 } else { 0.0 },
+                    opacity,
+                    0.0,
+                    0.0,
+                ],
             });
             draws.push((b, off));
         }
@@ -552,7 +637,11 @@ impl Renderer {
                 resolve_target,
                 ops: wgpu::Operations {
                     load: wgpu::LoadOp::Clear(premultiplied_clear(frame.background)),
-                    store: if resolve_target.is_some() { wgpu::StoreOp::Discard } else { wgpu::StoreOp::Store },
+                    store: if resolve_target.is_some() {
+                        wgpu::StoreOp::Discard
+                    } else {
+                        wgpu::StoreOp::Store
+                    },
                 },
             })],
             depth_stencil_attachment: None,
@@ -602,8 +691,16 @@ impl Renderer {
         };
         let mut verts: Vec<f32> = Vec::with_capacity(n * 6);
         for (p, nr) in mesh.positions.iter().zip(normals) {
-            let p = if p.iter().all(|c| c.is_finite()) { *p } else { [0.0; 3] };
-            let nr = if nr.iter().all(|c| c.is_finite()) { *nr } else { [0.0, 0.0, 1.0] };
+            let p = if p.iter().all(|c| c.is_finite()) {
+                *p
+            } else {
+                [0.0; 3]
+            };
+            let nr = if nr.iter().all(|c| c.is_finite()) {
+                *nr
+            } else {
+                [0.0, 0.0, 1.0]
+            };
             verts.extend_from_slice(&p);
             verts.extend_from_slice(&nr);
         }
@@ -612,18 +709,44 @@ impl Renderer {
             .as_chunks::<3>()
             .0
             .iter()
-            .flat_map(|t| if t.iter().all(|&i| (i as usize) < n) { [t[0], t[1], t[2]] } else { [0, 0, 0] })
+            .flat_map(|t| {
+                if t.iter().all(|&i| (i as usize) < n) {
+                    [t[0], t[1], t[2]]
+                } else {
+                    [0, 0, 0]
+                }
+            })
             .collect();
         let buffers = if n > 0 && !idx.is_empty() {
-            let vb = self.buffer("wcad_mesh_vb", bytemuck::cast_slice(&verts), wgpu::BufferUsages::VERTEX);
-            let ib = self.buffer("wcad_mesh_ib", bytemuck::cast_slice(&idx), wgpu::BufferUsages::INDEX);
+            let vb = self.buffer(
+                "wcad_mesh_vb",
+                bytemuck::cast_slice(&verts),
+                wgpu::BufferUsages::VERTEX,
+            );
+            let ib = self.buffer(
+                "wcad_mesh_ib",
+                bytemuck::cast_slice(&idx),
+                wgpu::BufferUsages::INDEX,
+            );
             vb.zip(ib)
         } else {
             None
         };
-        let index_count = if buffers.is_some() { idx.len() as u32 } else { 0 };
+        let index_count = if buffers.is_some() {
+            idx.len() as u32
+        } else {
+            0
+        };
         let style = self.meshes.remove(&id).map(|m| m.style).unwrap_or_default();
-        self.meshes.insert(id, GpuMesh { buffers, index_count, bbox: mesh.bbox(), style });
+        self.meshes.insert(
+            id,
+            GpuMesh {
+                buffers,
+                index_count,
+                bbox: mesh.bbox(),
+                style,
+            },
+        );
         self.rev3d += 1;
     }
 
@@ -733,8 +856,26 @@ impl Renderer {
     fn key_3d(&self, vp: &Viewport, cam: &Camera3D, frame: &Frame3D) -> u64 {
         let mut h = std::collections::hash_map::DefaultHasher::new();
         "3d".hash(&mut h);
-        (vp.uid(), vp.generation(), self.rev3d, cam.ortho, frame.flat_shading).hash(&mut h);
-        hash_f64(&mut h, &[cam.target.x, cam.target.y, cam.target.z, cam.distance, cam.yaw, cam.pitch, cam.fov_y]);
+        (
+            vp.uid(),
+            vp.generation(),
+            self.rev3d,
+            cam.ortho,
+            frame.flat_shading,
+        )
+            .hash(&mut h);
+        hash_f64(
+            &mut h,
+            &[
+                cam.target.x,
+                cam.target.y,
+                cam.target.z,
+                cam.distance,
+                cam.yaw,
+                cam.pitch,
+                cam.fov_y,
+            ],
+        );
         hash_f32(&mut h, &frame.background_top);
         hash_f32(&mut h, &frame.background_bottom);
         hash_f32(&mut h, &[frame.pixel_scale]);
@@ -770,9 +911,17 @@ impl Renderer {
             return None;
         }
         let spacing = grid.spacing;
-        let major = if grid.major_every > 1 { spacing * grid.major_every as f64 } else { 0.0 };
+        let major = if grid.major_every > 1 {
+            spacing * grid.major_every as f64
+        } else {
+            0.0
+        };
         let period = if major > 0.0 { major } else { spacing };
-        let radius = if grid.radius.is_finite() && grid.radius > 0.0 { grid.radius } else { cam.distance.abs() * 4.0 };
+        let radius = if grid.radius.is_finite() && grid.radius > 0.0 {
+            grid.radius
+        } else {
+            cam.distance.abs() * 4.0
+        };
         if !(radius.is_finite() && radius > 0.0) {
             return None;
         }
@@ -796,7 +945,12 @@ impl Renderer {
             major: grid.major_color,
             axis_x: grid.x_axis_color,
             axis_y: grid.y_axis_color,
-            params: [spacing as f32, major as f32, radius as f32, finite_or(grid.line_width_px, 1.0)],
+            params: [
+                spacing as f32,
+                major as f32,
+                radius as f32,
+                finite_or(grid.line_width_px, 1.0),
+            ],
             offsets: [0.0, 0.0, anchor.x as f32, anchor.y as f32],
         };
         Some((model, radius, u))
@@ -824,7 +978,10 @@ impl Renderer {
             bbox = bbox.union(&transform_bbox(&o.bbox, &o.style.transform));
         }
         if let Some((model, radius, _)) = &grid {
-            let quad = BBox3 { min: DVec3::new(-radius, -radius, 0.0), max: DVec3::new(*radius, *radius, 0.0) };
+            let quad = BBox3 {
+                min: DVec3::new(-radius, -radius, 0.0),
+                max: DVec3::new(*radius, *radius, 0.0),
+            };
             bbox = bbox.union(&transform_bbox(&quad, model));
         }
         let (near, far) = cam.depth_range(&bbox);
@@ -835,8 +992,18 @@ impl Renderer {
         let mut u = UniformArena::new(self.stride);
         u.push(&Frame3DU {
             proj: mat_f32(&proj),
-            viewport: [size.x as f32, size.y as f32, pixel_scale, if cam.ortho { 0.0 } else { 1.0 }],
-            light: [light.x as f32, light.y as f32, light.z as f32, if frame.flat_shading { 1.0 } else { 0.0 }],
+            viewport: [
+                size.x as f32,
+                size.y as f32,
+                pixel_scale,
+                if cam.ortho { 0.0 } else { 1.0 },
+            ],
+            light: [
+                light.x as f32,
+                light.y as f32,
+                light.z as f32,
+                if frame.flat_shading { 1.0 } else { 0.0 },
+            ],
             up: [up.x as f32, up.y as f32, up.z as f32, 0.0],
             sky: [AMBIENT_SKY[0], AMBIENT_SKY[1], AMBIENT_SKY[2], 1.0],
             ground: [AMBIENT_GROUND[0], AMBIENT_GROUND[1], AMBIENT_GROUND[2], 1.0],
@@ -868,8 +1035,17 @@ impl Renderer {
             };
             let ranges = normalize_ranges(&m.style.highlight_ranges, m.index_count, 3);
             for (range, color, _) in split_ranges(m.index_count, &ranges, base, true) {
-                let offset = u.push(&Draw3DU { model_view: mv32, normal_mat: nm32, color, params: [0.0; 4] });
-                let d = Draw3D::Mesh { bufs, range, offset };
+                let offset = u.push(&Draw3DU {
+                    model_view: mv32,
+                    normal_mat: nm32,
+                    color,
+                    params: [0.0; 4],
+                });
+                let d = Draw3D::Mesh {
+                    bufs,
+                    range,
+                    offset,
+                };
                 if is_transparent {
                     transparent.push((depth, d));
                 } else {
@@ -929,12 +1105,19 @@ impl Renderer {
                 resolve_target,
                 ops: wgpu::Operations {
                     load: wgpu::LoadOp::Clear(premultiplied_clear(frame.background_bottom)),
-                    store: if resolve_target.is_some() { wgpu::StoreOp::Discard } else { wgpu::StoreOp::Store },
+                    store: if resolve_target.is_some() {
+                        wgpu::StoreOp::Discard
+                    } else {
+                        wgpu::StoreOp::Store
+                    },
                 },
             })],
             depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                 view: vp.depth_view(),
-                depth_ops: Some(wgpu::Operations { load: wgpu::LoadOp::Clear(0.0), store: wgpu::StoreOp::Discard }),
+                depth_ops: Some(wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(0.0),
+                    store: wgpu::StoreOp::Discard,
+                }),
                 stencil_ops: None,
             }),
             timestamp_writes: None,
@@ -946,7 +1129,11 @@ impl Renderer {
         pass.draw(0..3, 0..1);
 
         let replay = |pass: &mut wgpu::RenderPass<'_>, d: &Draw3D<'_>| match d {
-            Draw3D::Mesh { bufs, range, offset } => {
+            Draw3D::Mesh {
+                bufs,
+                range,
+                offset,
+            } => {
                 pass.set_bind_group(0, &bind_group, &[*offset]);
                 pass.set_vertex_buffer(0, bufs.0.slice(..));
                 pass.set_index_buffer(bufs.1.slice(..), wgpu::IndexFormat::Uint32);
@@ -955,7 +1142,10 @@ impl Renderer {
             Draw3D::Lines { buf, range, offset } => {
                 pass.set_bind_group(0, &bind_group, &[*offset]);
                 let stride = size_of::<LineSegment3D>() as u64;
-                pass.set_vertex_buffer(0, buf.slice(range.start as u64 * stride..range.end as u64 * stride));
+                pass.set_vertex_buffer(
+                    0,
+                    buf.slice(range.start as u64 * stride..range.end as u64 * stride),
+                );
                 pass.draw(0..6, 0..(range.end - range.start));
             }
         };
@@ -1022,11 +1212,12 @@ impl Renderer {
     fn create_pipelines(&self, samples: u32) -> Pipelines {
         let d = &self.device;
         let premul = Some(wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING);
-        let vb = |stride: u64, step, attrs: &'static [wgpu::VertexAttribute]| wgpu::VertexBufferLayout {
-            array_stride: stride,
-            step_mode: step,
-            attributes: attrs,
-        };
+        let vb =
+            |stride: u64, step, attrs: &'static [wgpu::VertexAttribute]| wgpu::VertexBufferLayout {
+                array_stride: stride,
+                step_mode: step,
+                attributes: attrs,
+            };
         let depth = |write: bool, compare, bias: wgpu::DepthBiasState| {
             Some(wgpu::DepthStencilState {
                 format: DEPTH_FORMAT,
@@ -1037,7 +1228,11 @@ impl Renderer {
             })
         };
         // Faces are pushed away from the eye (reverse-Z: negative bias) so coplanar edges win.
-        let face_bias = wgpu::DepthBiasState { constant: -4, slope_scale: -1.0, clamp: 0.0 };
+        let face_bias = wgpu::DepthBiasState {
+            constant: -4,
+            slope_scale: -1.0,
+            clamp: 0.0,
+        };
         let no_bias = wgpu::DepthBiasState::default();
         let make = |label: &str,
                     module: &wgpu::ShaderModule,
@@ -1062,7 +1257,11 @@ impl Renderer {
                     ..Default::default()
                 },
                 depth_stencil,
-                multisample: wgpu::MultisampleState { count: samples, mask: !0, alpha_to_coverage_enabled: false },
+                multisample: wgpu::MultisampleState {
+                    count: samples,
+                    mask: !0,
+                    alpha_to_coverage_enabled: false,
+                },
                 fragment: Some(wgpu::FragmentState {
                     module,
                     entry_point: Some(fs),
@@ -1080,16 +1279,52 @@ impl Renderer {
         let inst = wgpu::VertexStepMode::Instance;
         let vert = wgpu::VertexStepMode::Vertex;
         let fill_vb = [Some(vb(size_of::<FillVertex>() as u64, vert, &FILL_ATTRS))];
-        let line2d_vb = [Some(vb(size_of::<LineSegment2D>() as u64, inst, &LINE2D_ATTRS))];
-        let point_vb = [Some(vb(size_of::<PointMarker>() as u64, inst, &POINT_ATTRS))];
+        let line2d_vb = [Some(vb(
+            size_of::<LineSegment2D>() as u64,
+            inst,
+            &LINE2D_ATTRS,
+        ))];
+        let point_vb = [Some(vb(
+            size_of::<PointMarker>() as u64,
+            inst,
+            &POINT_ATTRS,
+        ))];
         let mesh_vb = [Some(vb(MESH_STRIDE, vert, &MESH_ATTRS))];
-        let line3d_vb = [Some(vb(size_of::<LineSegment3D>() as u64, inst, &LINE3D_ATTRS))];
+        let line3d_vb = [Some(vb(
+            size_of::<LineSegment3D>() as u64,
+            inst,
+            &LINE3D_ATTRS,
+        ))];
         use wgpu::CompareFunction::{Always, GreaterEqual};
         Pipelines {
             samples,
-            fill2d: make("wcad_fill2d", &self.shader2d, "vs_fill", "fs_fill", &fill_vb, None, premul),
-            line2d: make("wcad_line2d", &self.shader2d, "vs_line", "fs_line", &line2d_vb, None, premul),
-            point2d: make("wcad_point2d", &self.shader2d, "vs_point", "fs_point", &point_vb, None, premul),
+            fill2d: make(
+                "wcad_fill2d",
+                &self.shader2d,
+                "vs_fill",
+                "fs_fill",
+                &fill_vb,
+                None,
+                premul,
+            ),
+            line2d: make(
+                "wcad_line2d",
+                &self.shader2d,
+                "vs_line",
+                "fs_line",
+                &line2d_vb,
+                None,
+                premul,
+            ),
+            point2d: make(
+                "wcad_point2d",
+                &self.shader2d,
+                "vs_point",
+                "fs_point",
+                &point_vb,
+                None,
+                premul,
+            ),
             background: make(
                 "wcad_background",
                 &self.shader3d,
@@ -1165,7 +1400,12 @@ pub(crate) fn split_ranges(
         }
         let color = if blend_over_base {
             let t = c[3].clamp(0.0, 1.0);
-            [base[0] + (c[0] - base[0]) * t, base[1] + (c[1] - base[1]) * t, base[2] + (c[2] - base[2]) * t, base[3]]
+            [
+                base[0] + (c[0] - base[0]) * t,
+                base[1] + (c[1] - base[1]) * t,
+                base[2] + (c[2] - base[2]) * t,
+                base[3],
+            ]
         } else {
             *c
         };

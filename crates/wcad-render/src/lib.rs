@@ -62,7 +62,12 @@ pub type Rgba = [f32; 4];
 /// Builds an [`Rgba`] from 8-bit sRGB channels.
 #[inline]
 pub fn rgba8(r: u8, g: u8, b: u8, a: u8) -> Rgba {
-    [r as f32 / 255.0, g as f32 / 255.0, b as f32 / 255.0, a as f32 / 255.0]
+    [
+        r as f32 / 255.0,
+        g as f32 / 255.0,
+        b as f32 / 255.0,
+        a as f32 / 255.0,
+    ]
 }
 
 /// Opaque [`Rgba`] from 8-bit sRGB channels.
@@ -74,7 +79,13 @@ pub fn rgb8(r: u8, g: u8, b: u8) -> Rgba {
 /// Quantizes an [`Rgba`] to the 8-bit form stored in GPU vertex data (clamped, NaN → 0).
 #[inline]
 pub(crate) fn pack_rgba(c: Rgba) -> [u8; 4] {
-    let q = |v: f32| if v.is_nan() { 0 } else { (v.clamp(0.0, 1.0) * 255.0 + 0.5) as u8 };
+    let q = |v: f32| {
+        if v.is_nan() {
+            0
+        } else {
+            (v.clamp(0.0, 1.0) * 255.0 + 0.5) as u8
+        }
+    };
     [q(c[0]), q(c[1]), q(c[2]), q(c[3])]
 }
 
@@ -100,8 +111,14 @@ pub(crate) fn shader_source(parts: &[&str]) -> String {
 pub(crate) fn shader_modules() -> [(&'static str, String); 3] {
     [
         ("wcad_shader2d", shader_source(&[SHADER_COMMON, SHADER_2D])),
-        ("wcad_shader3d", shader_source(&[SHADER_COMMON, SHADER_FRAME3D, SHADER_3D])),
-        ("wcad_grid3d", shader_source(&[SHADER_COMMON, SHADER_FRAME3D, SHADER_GRID])),
+        (
+            "wcad_shader3d",
+            shader_source(&[SHADER_COMMON, SHADER_FRAME3D, SHADER_3D]),
+        ),
+        (
+            "wcad_grid3d",
+            shader_source(&[SHADER_COMMON, SHADER_FRAME3D, SHADER_GRID]),
+        ),
     ]
 }
 

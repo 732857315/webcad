@@ -24,13 +24,21 @@ pub struct Camera2D {
 
 impl Default for Camera2D {
     fn default() -> Self {
-        Self { center: DVec2::ZERO, px_per_unit: 1.0, rotation: 0.0 }
+        Self {
+            center: DVec2::ZERO,
+            px_per_unit: 1.0,
+            rotation: 0.0,
+        }
     }
 }
 
 impl Camera2D {
     pub fn new(center: DVec2, px_per_unit: f64) -> Self {
-        Self { center, px_per_unit, rotation: 0.0 }
+        Self {
+            center,
+            px_per_unit,
+            rotation: 0.0,
+        }
     }
 
     fn scale(&self) -> f64 {
@@ -101,7 +109,12 @@ impl Camera2D {
         self.center = bbox.center();
         // Extent of the box along the (possibly rotated) screen axes.
         let (r, u) = (self.right(), self.up());
-        let corners = [bbox.min, DVec2::new(bbox.max.x, bbox.min.y), bbox.max, DVec2::new(bbox.min.x, bbox.max.y)];
+        let corners = [
+            bbox.min,
+            DVec2::new(bbox.max.x, bbox.min.y),
+            bbox.max,
+            DVec2::new(bbox.min.x, bbox.max.y),
+        ];
         let (mut w, mut h) = (0.0f64, 0.0f64);
         for c in corners {
             let d = c - self.center;
@@ -134,7 +147,12 @@ impl Camera2D {
         let s = self.scale();
         let (r, u) = (self.right(), self.up());
         // local pixel = [r·v, u·v] * s  →  columns are (r.x, u.x)*s and (r.y, u.y)*s
-        let m = [(r.x * s) as f32, (u.x * s) as f32, (r.y * s) as f32, (u.y * s) as f32];
+        let m = [
+            (r.x * s) as f32,
+            (u.x * s) as f32,
+            (r.y * s) as f32,
+            (u.y * s) as f32,
+        ];
         let d = origin - self.center;
         let t = [(d.dot(r) * s) as f32, (d.dot(u) * s) as f32];
         (m, t)
@@ -245,7 +263,11 @@ impl Ray3 {
             let c = self.dir.dot(r);
             let bb = self.dir.dot(d2);
             let denom = aa * ee - bb * bb;
-            let s0 = if denom.abs() > 1e-300 { ((bb * c - aa * f) / denom).clamp(0.0, 1.0) } else { 0.0 };
+            let s0 = if denom.abs() > 1e-300 {
+                ((bb * c - aa * f) / denom).clamp(0.0, 1.0)
+            } else {
+                0.0
+            };
             // Line parameter for that segment point, then re-clamp the segment parameter.
             let t0 = (bb * s0 - c) / aa.max(1e-300);
             s = ((t0 * bb + f) / ee).clamp(0.0, 1.0);
@@ -276,22 +298,41 @@ pub struct Camera3D {
 impl Default for Camera3D {
     fn default() -> Self {
         let (yaw, pitch) = StandardView::IsoSE.yaw_pitch();
-        Self { target: DVec3::ZERO, distance: 100.0, yaw, pitch, fov_y: 45f64.to_radians(), ortho: false }
+        Self {
+            target: DVec3::ZERO,
+            distance: 100.0,
+            yaw,
+            pitch,
+            fov_y: 45f64.to_radians(),
+            ortho: false,
+        }
     }
 }
 
 impl Camera3D {
     fn dist(&self) -> f64 {
-        if self.distance.is_finite() && self.distance > 0.0 { self.distance.clamp(1e-9, 1e15) } else { 1.0 }
+        if self.distance.is_finite() && self.distance > 0.0 {
+            self.distance.clamp(1e-9, 1e15)
+        } else {
+            1.0
+        }
     }
 
     fn fov(&self) -> f64 {
-        if self.fov_y.is_finite() { self.fov_y.clamp(1e-3, 3.0) } else { 45f64.to_radians() }
+        if self.fov_y.is_finite() {
+            self.fov_y.clamp(1e-3, 3.0)
+        } else {
+            45f64.to_radians()
+        }
     }
 
     fn pitch_c(&self) -> f64 {
         use std::f64::consts::FRAC_PI_2;
-        if self.pitch.is_finite() { self.pitch.clamp(-FRAC_PI_2, FRAC_PI_2) } else { 0.0 }
+        if self.pitch.is_finite() {
+            self.pitch.clamp(-FRAC_PI_2, FRAC_PI_2)
+        } else {
+            0.0
+        }
     }
 
     fn yaw_c(&self) -> f64 {
@@ -346,11 +387,19 @@ impl Camera3D {
     /// Perspective uses an infinite far plane (`far` is ignored); orthographic maps `near..far`
     /// (view-space distances in front of the eye, may be negative) to `1..0`.
     pub fn proj_matrix(&self, aspect: f64, near: f64, far: f64) -> DMat4 {
-        let aspect = if aspect.is_finite() && aspect > 0.0 { aspect } else { 1.0 };
+        let aspect = if aspect.is_finite() && aspect > 0.0 {
+            aspect
+        } else {
+            1.0
+        };
         if self.ortho {
             let h = self.half_height_at_target();
             let w = h * aspect;
-            let (n, f) = if far - near > 1e-12 { (near, far) } else { (near, near + 1.0) };
+            let (n, f) = if far - near > 1e-12 {
+                (near, far)
+            } else {
+                (near, near + 1.0)
+            };
             let r = 1.0 / (f - n);
             DMat4::from_cols(
                 DVec4::new(1.0 / w, 0.0, 0.0, 0.0),
@@ -359,7 +408,11 @@ impl Camera3D {
                 DVec4::new(0.0, 0.0, f * r, 1.0),
             )
         } else {
-            let near = if near.is_finite() && near > 0.0 { near } else { self.dist() * 1e-3 };
+            let near = if near.is_finite() && near > 0.0 {
+                near
+            } else {
+                self.dist() * 1e-3
+            };
             let g = 1.0 / (self.fov() * 0.5).tan();
             DMat4::from_cols(
                 DVec4::new(g / aspect, 0.0, 0.0, 0.0),
@@ -374,7 +427,11 @@ impl Camera3D {
     pub fn depth_range(&self, bbox: &BBox3) -> (f64, f64) {
         let d = self.dist();
         if bbox.is_empty() || !bbox.min.is_finite() || !bbox.max.is_finite() {
-            return if self.ortho { (-d * 10.0, d * 10.0) } else { (d * 1e-3, d * 1e3) };
+            return if self.ortho {
+                (-d * 10.0, d * 10.0)
+            } else {
+                (d * 1e-3, d * 1e3)
+            };
         }
         let view = self.view_matrix();
         let (mut dmin, mut dmax) = (f64::INFINITY, f64::NEG_INFINITY);
@@ -392,7 +449,11 @@ impl Camera3D {
             let margin = (dmax - dmin) * 0.02 + d * 1e-3 + 1e-9;
             (dmin - margin, dmax + margin)
         } else {
-            let near = if dmin > 0.0 { dmin * 0.5 } else { dmax.max(d) * 1e-5 };
+            let near = if dmin > 0.0 {
+                dmin * 0.5
+            } else {
+                dmax.max(d) * 1e-5
+            };
             (near.max(1e-12), dmax.max(near) * 2.0 + 1e-9)
         }
     }
@@ -422,7 +483,10 @@ impl Camera3D {
         } else {
             let tan = (self.fov() * 0.5).tan();
             let dir = (f + r * (ndc.x * tan * aspect) + u * (ndc.y * tan)).normalize_or(f);
-            Ray3 { origin: self.eye(), dir }
+            Ray3 {
+                origin: self.eye(),
+                dir,
+            }
         }
     }
 
@@ -442,7 +506,10 @@ impl Camera3D {
             let tan = (self.fov() * 0.5).tan();
             DVec2::new(v.x / (depth * tan * aspect), v.y / (depth * tan))
         };
-        Some(DVec2::new((ndc.x + 1.0) * 0.5 * vp.x, (1.0 - ndc.y) * 0.5 * vp.y))
+        Some(DVec2::new(
+            (ndc.x + 1.0) * 0.5 * vp.x,
+            (1.0 - ndc.y) * 0.5 * vp.y,
+        ))
     }
 
     /// World units per pixel at the target distance.
@@ -475,7 +542,10 @@ impl Camera3D {
         }
         let plane = Plane::from_normal(self.target, self.view_dir());
         let ray = self.ray_from_screen(screen_px, viewport);
-        let anchor = ray.intersect_plane(&plane).map(|t| ray.at(t)).unwrap_or(self.target);
+        let anchor = ray
+            .intersect_plane(&plane)
+            .map(|t| ray.at(t))
+            .unwrap_or(self.target);
         let new_dist = (self.dist() / factor).clamp(1e-9, 1e15);
         let k = new_dist / self.dist();
         self.target = anchor + (self.target - anchor) * k;
@@ -510,9 +580,17 @@ impl Camera3D {
         }
         self.target = bbox.center();
         let radius = (bbox.extent() * 0.5).max(1e-9);
-        let aspect = if aspect.is_finite() && aspect > 0.0 { aspect } else { 1.0 };
+        let aspect = if aspect.is_finite() && aspect > 0.0 {
+            aspect
+        } else {
+            1.0
+        };
         let half_v = self.fov() * 0.5;
-        let half_min = if aspect < 1.0 { (half_v.tan() * aspect).atan() } else { half_v };
+        let half_min = if aspect < 1.0 {
+            (half_v.tan() * aspect).atan()
+        } else {
+            half_v
+        };
         self.distance = if self.ortho {
             // Visible half-extent (in the narrow direction) = distance · tan(half_v) · min(aspect, 1).
             radius * 1.05 / (half_v.tan() * aspect.min(1.0))

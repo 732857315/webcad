@@ -10,7 +10,10 @@ use wcad_math::{DVec2, normalize_pi};
 const EPS: f64 = 1e-6;
 
 fn close(a: f64, b: f64, what: &str) {
-    assert!((a - b).abs() <= EPS * (1.0 + a.abs().max(b.abs())), "{what}: {a} vs {b}");
+    assert!(
+        (a - b).abs() <= EPS * (1.0 + a.abs().max(b.abs())),
+        "{what}: {a} vs {b}"
+    );
 }
 
 fn close_angle(a: f64, b: f64, what: &str) {
@@ -18,7 +21,10 @@ fn close_angle(a: f64, b: f64, what: &str) {
 }
 
 fn close_pt(a: DVec2, b: DVec2, what: &str) {
-    assert!(a.distance(b) <= EPS * (1.0 + a.length().max(b.length())), "{what}: {a:?} vs {b:?}");
+    assert!(
+        a.distance(b) <= EPS * (1.0 + a.length().max(b.length())),
+        "{what}: {a:?} vs {b:?}"
+    );
 }
 
 fn close_curve(a: &Curve2, b: &Curve2, what: &str) {
@@ -87,7 +93,12 @@ fn ltname(d: &Drawing, r: LinetypeRef) -> String {
     match r {
         LinetypeRef::ByLayer => "BYLAYER".into(),
         LinetypeRef::ByBlock => "BYBLOCK".into(),
-        LinetypeRef::Id(id) => d.tables.linetypes.get(&id).map(|l| l.name.to_ascii_uppercase()).unwrap_or_default(),
+        LinetypeRef::Id(id) => d
+            .tables
+            .linetypes
+            .get(&id)
+            .map(|l| l.name.to_ascii_uppercase())
+            .unwrap_or_default(),
     }
 }
 
@@ -99,8 +110,16 @@ fn compare_entity(da: &Drawing, a: &Entity, db: &Drawing, b: &Entity, what: &str
         "{what}: layer"
     );
     assert_color(a.color, b.color, &what);
-    assert_eq!(ltname(da, a.linetype), ltname(db, b.linetype), "{what}: linetype");
-    close(a.linetype_scale, b.linetype_scale, &format!("{what}: ltscale"));
+    assert_eq!(
+        ltname(da, a.linetype),
+        ltname(db, b.linetype),
+        "{what}: linetype"
+    );
+    close(
+        a.linetype_scale,
+        b.linetype_scale,
+        &format!("{what}: ltscale"),
+    );
     assert_eq!(a.lineweight, b.lineweight, "{what}: lineweight");
     match (&a.kind, &b.kind) {
         (EntityKind::Point { p }, EntityKind::Point { p: q }) => close_pt(*p, *q, &what),
@@ -110,9 +129,16 @@ fn compare_entity(da: &Drawing, a: &Entity, db: &Drawing, b: &Entity, what: &str
             close_angle(x.rotation, y.rotation, &format!("{what} rotation"));
             close(x.width_factor, y.width_factor, &format!("{what} width"));
             close_angle(x.oblique, y.oblique, &format!("{what} oblique"));
-            assert_eq!((x.halign, x.valign), (y.halign, y.valign), "{what}: alignment");
+            assert_eq!(
+                (x.halign, x.valign),
+                (y.halign, y.valign),
+                "{what}: alignment"
+            );
             assert_eq!(x.text, y.text, "{what}: text");
-            assert_eq!(da.tables.text_styles[&x.style].name, db.tables.text_styles[&y.style].name, "{what}: style");
+            assert_eq!(
+                da.tables.text_styles[&x.style].name, db.tables.text_styles[&y.style].name,
+                "{what}: style"
+            );
         }
         (EntityKind::MText(x), EntityKind::MText(y)) => {
             close_pt(x.pos, y.pos, &what);
@@ -124,7 +150,10 @@ fn compare_entity(da: &Drawing, a: &Entity, db: &Drawing, b: &Entity, what: &str
             assert_eq!(x.text, y.text, "{what}: text");
         }
         (EntityKind::Dimension(x), EntityKind::Dimension(y)) => {
-            assert_eq!(da.tables.dim_styles[&x.style].name, db.tables.dim_styles[&y.style].name, "{what}: style");
+            assert_eq!(
+                da.tables.dim_styles[&x.style].name, db.tables.dim_styles[&y.style].name,
+                "{what}: style"
+            );
             assert_eq!(x.text_override, y.text_override, "{what}: override");
             match (x.text_pos, y.text_pos) {
                 (Some(p), Some(q)) => close_pt(p, q, &what),
@@ -133,27 +162,66 @@ fn compare_entity(da: &Drawing, a: &Entity, db: &Drawing, b: &Entity, what: &str
             }
             match (&x.kind, &y.kind) {
                 (
-                    DimKind::Linear { p1, p2, line_point, rotation },
-                    DimKind::Linear { p1: q1, p2: q2, line_point: l2, rotation: r2 },
+                    DimKind::Linear {
+                        p1,
+                        p2,
+                        line_point,
+                        rotation,
+                    },
+                    DimKind::Linear {
+                        p1: q1,
+                        p2: q2,
+                        line_point: l2,
+                        rotation: r2,
+                    },
                 ) => {
                     close_pt(*p1, *q1, &what);
                     close_pt(*p2, *q2, &what);
                     close_pt(*line_point, *l2, &what);
                     close_angle(*rotation, *r2, &what);
                 }
-                (DimKind::Aligned { p1, p2, line_point }, DimKind::Aligned { p1: q1, p2: q2, line_point: l2 }) => {
+                (
+                    DimKind::Aligned { p1, p2, line_point },
+                    DimKind::Aligned {
+                        p1: q1,
+                        p2: q2,
+                        line_point: l2,
+                    },
+                ) => {
                     close_pt(*p1, *q1, &what);
                     close_pt(*p2, *q2, &what);
                     close_pt(*line_point, *l2, &what);
                 }
-                (DimKind::Radius { center, point }, DimKind::Radius { center: c2, point: p2 })
-                | (DimKind::Diameter { center, point }, DimKind::Diameter { center: c2, point: p2 }) => {
+                (
+                    DimKind::Radius { center, point },
+                    DimKind::Radius {
+                        center: c2,
+                        point: p2,
+                    },
+                )
+                | (
+                    DimKind::Diameter { center, point },
+                    DimKind::Diameter {
+                        center: c2,
+                        point: p2,
+                    },
+                ) => {
                     close_pt(*center, *c2, &what);
                     close_pt(*point, *p2, &what);
                 }
                 (
-                    DimKind::Angular { vertex, p1, p2, arc_point },
-                    DimKind::Angular { vertex: v2, p1: q1, p2: q2, arc_point: a2 },
+                    DimKind::Angular {
+                        vertex,
+                        p1,
+                        p2,
+                        arc_point,
+                    },
+                    DimKind::Angular {
+                        vertex: v2,
+                        p1: q1,
+                        p2: q2,
+                        arc_point: a2,
+                    },
                 ) => {
                     close_pt(*vertex, *v2, &what);
                     close_pt(*p1, *q1, &what);
@@ -161,8 +229,18 @@ fn compare_entity(da: &Drawing, a: &Entity, db: &Drawing, b: &Entity, what: &str
                     close_pt(*arc_point, *a2, &what);
                 }
                 (
-                    DimKind::Ordinate { origin, point, leader_end, x_axis },
-                    DimKind::Ordinate { origin: o2, point: p2, leader_end: l2, x_axis: x2 },
+                    DimKind::Ordinate {
+                        origin,
+                        point,
+                        leader_end,
+                        x_axis,
+                    },
+                    DimKind::Ordinate {
+                        origin: o2,
+                        point: p2,
+                        leader_end: l2,
+                        x_axis: x2,
+                    },
                 ) => {
                     close_pt(*origin, *o2, &what);
                     close_pt(*point, *p2, &what);
@@ -173,21 +251,34 @@ fn compare_entity(da: &Drawing, a: &Entity, db: &Drawing, b: &Entity, what: &str
             }
         }
         (EntityKind::Hatch(x), EntityKind::Hatch(y)) => {
-            assert_eq!(x.pattern.name.to_ascii_uppercase(), y.pattern.name.to_ascii_uppercase(), "{what}: pattern");
+            assert_eq!(
+                x.pattern.name.to_ascii_uppercase(),
+                y.pattern.name.to_ascii_uppercase(),
+                "{what}: pattern"
+            );
             if !x.is_solid() {
                 close_angle(x.pattern.angle, y.pattern.angle, &what);
                 close(x.pattern.scale, y.pattern.scale, &what);
             }
             assert_eq!(x.loops.len(), y.loops.len(), "{what}: loops");
             for (la, lb) in x.loops.iter().zip(&y.loops) {
-                assert_eq!(la.curves.len(), lb.curves.len(), "{what}: loop curves {:?} vs {:?}", la.curves, lb.curves);
+                assert_eq!(
+                    la.curves.len(),
+                    lb.curves.len(),
+                    "{what}: loop curves {:?} vs {:?}",
+                    la.curves,
+                    lb.curves
+                );
                 for (ca, cb) in la.curves.iter().zip(&lb.curves) {
                     close_curve(ca, cb, &what);
                 }
             }
         }
         (EntityKind::Insert(x), EntityKind::Insert(y)) => {
-            assert_eq!(da.blocks[&x.block].name, db.blocks[&y.block].name, "{what}: block");
+            assert_eq!(
+                da.blocks[&x.block].name, db.blocks[&y.block].name,
+                "{what}: block"
+            );
             close_pt(x.pos, y.pos, &what);
             close_pt(x.scale, y.scale, &what);
             close_angle(x.rotation, y.rotation, &what);
@@ -202,14 +293,28 @@ fn compare_entity(da: &Drawing, a: &Entity, db: &Drawing, b: &Entity, what: &str
 fn compare_docs(a: &Document, b: &Document, label: &str) {
     let (da, db) = (&a.drawing, &b.drawing);
     assert_eq!(a.meta.units, b.meta.units, "{label}: units");
-    close(da.tables.settings.ltscale, db.tables.settings.ltscale, "ltscale");
+    close(
+        da.tables.settings.ltscale,
+        db.tables.settings.ltscale,
+        "ltscale",
+    );
 
     // Tables.
     for l in da.tables.layers.values() {
-        let id = db.layer_by_name(&l.name).unwrap_or_else(|| panic!("{label}: layer {} missing", l.name));
+        let id = db
+            .layer_by_name(&l.name)
+            .unwrap_or_else(|| panic!("{label}: layer {} missing", l.name));
         let m = &db.tables.layers[&id];
-        assert_color(l.color, m.color, &format!("{label}: layer {} color", l.name));
-        assert_eq!(l.lineweight, m.lineweight, "{label}: layer {} lineweight", l.name);
+        assert_color(
+            l.color,
+            m.color,
+            &format!("{label}: layer {} color", l.name),
+        );
+        assert_eq!(
+            l.lineweight, m.lineweight,
+            "{label}: layer {} lineweight",
+            l.name
+        );
         assert_eq!(
             (l.visible, l.frozen, l.locked, l.plot),
             (m.visible, m.frozen, m.locked, m.plot),
@@ -229,23 +334,49 @@ fn compare_docs(a: &Document, b: &Document, label: &str) {
     for (p, q) in pat.iter().zip([5.0, -2.5, 0.0, -2.5]) {
         close(*p, q, "MYDASH");
     }
-    let cjk = db.tables.text_styles.values().find(|s| s.name == "CJK").expect("CJK style");
+    let cjk = db
+        .tables
+        .text_styles
+        .values()
+        .find(|s| s.name == "CJK")
+        .expect("CJK style");
     assert_eq!(cjk.font, "default");
     close(cjk.width_factor, 0.8, "style width");
-    close_angle(cjk.oblique, 15f64.to_radians(), &format!("{label}: style oblique"));
-    let iso = db.tables.dim_styles.values().find(|s| s.name == "ISO").expect("ISO dim style");
+    close_angle(
+        cjk.oblique,
+        15f64.to_radians(),
+        &format!("{label}: style oblique"),
+    );
+    let iso = db
+        .tables
+        .dim_styles
+        .values()
+        .find(|s| s.name == "ISO")
+        .expect("ISO dim style");
     close(iso.text_height, 3.5, "dimtxt");
     close(iso.arrow_size, 3.0, "dimasz");
     close(iso.ext_offset, 1.0, "dimexo");
     close(iso.ext_extend, 2.0, "dimexe");
     close(iso.text_gap, 0.8, "dimgap");
-    assert_eq!((iso.decimals, iso.angle_decimals), (1, 1), "{label}: dim decimals");
+    assert_eq!(
+        (iso.decimals, iso.angle_decimals),
+        (1, 1),
+        "{label}: dim decimals"
+    );
     assert_eq!(iso.suffix, " mm", "{label}: dimpost");
 
     // Blocks: base points are folded into the geometry on export.
     let ba = da.blocks.values().find(|b| b.name == "BOLT").expect("BOLT");
-    let bb = db.blocks.values().find(|b| b.name == "BOLT").expect("BOLT back");
-    assert_eq!(ba.entities.len(), bb.entities.len(), "{label}: block entities");
+    let bb = db
+        .blocks
+        .values()
+        .find(|b| b.name == "BOLT")
+        .expect("BOLT back");
+    assert_eq!(
+        ba.entities.len(),
+        bb.entities.len(),
+        "{label}: block entities"
+    );
     for (ea, eb) in ba.entities.values().zip(bb.entities.values()) {
         let mut ea = ea.clone();
         let shift = bb.base - ba.base;
@@ -264,7 +395,13 @@ fn compare_docs(a: &Document, b: &Document, label: &str) {
     let ea: Vec<&Entity> = da.entities.values().collect();
     let eb: Vec<&Entity> = db.entities.values().collect();
     let names = |v: &[&Entity]| v.iter().map(|e| e.kind.type_name()).collect::<Vec<_>>();
-    assert_eq!(ea.len(), eb.len(), "{label}: entity count {:?} vs {:?}", names(&ea), names(&eb));
+    assert_eq!(
+        ea.len(),
+        eb.len(),
+        "{label}: entity count {:?} vs {:?}",
+        names(&ea),
+        names(&eb)
+    );
     for (i, (x, y)) in ea.iter().zip(&eb).enumerate() {
         compare_entity(da, x, db, y, &format!("{label} #{i}"));
     }
@@ -278,7 +415,11 @@ fn dxf_round_trip_all_versions() {
         let text = String::from_utf8_lossy(&bytes);
         assert!(text.contains(v.acad_code()), "{v:?}: $ACADVER");
         let back = dxf::import(&bytes).unwrap_or_else(|e| panic!("import {v:?}: {e}"));
-        println!("DXF {v:?}: {} bytes, warnings {:?}", bytes.len(), back.warnings);
+        println!(
+            "DXF {v:?}: {} bytes, warnings {:?}",
+            bytes.len(),
+            back.warnings
+        );
         compare_docs(&s.doc, &back.document, &format!("DXF {v:?}"));
     }
 }
@@ -286,11 +427,21 @@ fn dxf_round_trip_all_versions() {
 #[test]
 fn dwg_round_trip() {
     let s = common::sample();
-    for v in [DxfVersion::R2000, DxfVersion::R2004, DxfVersion::R2010, DxfVersion::R2013, DxfVersion::R2018] {
+    for v in [
+        DxfVersion::R2000,
+        DxfVersion::R2004,
+        DxfVersion::R2010,
+        DxfVersion::R2013,
+        DxfVersion::R2018,
+    ] {
         let bytes = dwg::export(&s.doc, v).unwrap_or_else(|e| panic!("export {v:?}: {e}"));
         assert_eq!(&bytes[..6], v.acad_code().as_bytes(), "{v:?}: signature");
         let back = dwg::import(&bytes).unwrap_or_else(|e| panic!("import {v:?}: {e}"));
-        println!("DWG {v:?}: {} bytes, warnings {:?}", bytes.len(), back.warnings);
+        println!(
+            "DWG {v:?}: {} bytes, warnings {:?}",
+            bytes.len(),
+            back.warnings
+        );
         compare_docs(&s.doc, &back.document, &format!("DWG {v:?}"));
     }
 }
@@ -310,11 +461,19 @@ fn dwg_r2007_round_trip() {
 #[test]
 fn units_round_trip() {
     let mut s = common::sample();
-    for u in [Units::Inch, Units::Meter, Units::Unitless, Units::Foot, Units::Centimeter] {
+    for u in [
+        Units::Inch,
+        Units::Meter,
+        Units::Unitless,
+        Units::Foot,
+        Units::Centimeter,
+    ] {
         s.doc.meta.units = u;
-        let back = dxf::import(&dxf::export(&s.doc, DxfVersion::R2018).expect("dxf")).expect("import");
+        let back =
+            dxf::import(&dxf::export(&s.doc, DxfVersion::R2018).expect("dxf")).expect("import");
         assert_eq!(back.document.meta.units, u);
-        let back = dwg::import(&dwg::export(&s.doc, DxfVersion::R2004).expect("dwg")).expect("import");
+        let back =
+            dwg::import(&dwg::export(&s.doc, DxfVersion::R2004).expect("dwg")).expect("import");
         assert_eq!(back.document.meta.units, u);
     }
 }
@@ -340,7 +499,12 @@ fn data(name: &str) -> Vec<u8> {
 }
 
 fn kinds(doc: &Document) -> Vec<&'static str> {
-    let mut v: Vec<&'static str> = doc.drawing.entities.values().map(|e| e.kind.type_name()).collect();
+    let mut v: Vec<&'static str> = doc
+        .drawing
+        .entities
+        .values()
+        .map(|e| e.kind.type_name())
+        .collect();
     v.sort();
     v
 }
@@ -351,9 +515,32 @@ fn import_sample_files() {
         (
             "sample_R2018.dxf",
             14,
-            &["LINE", "CIRCLE", "ARC", "ELLIPSE", "LWPOLYLINE", "SPLINE", "TEXT", "MTEXT", "DIMENSION", "INSERT"][..],
+            &[
+                "LINE",
+                "CIRCLE",
+                "ARC",
+                "ELLIPSE",
+                "LWPOLYLINE",
+                "SPLINE",
+                "TEXT",
+                "MTEXT",
+                "DIMENSION",
+                "INSERT",
+            ][..],
         ),
-        ("sample_R2000.dxf", 14, &["LINE", "CIRCLE", "ARC", "ELLIPSE", "SPLINE", "MTEXT", "DIMENSION"][..]),
+        (
+            "sample_R2000.dxf",
+            14,
+            &[
+                "LINE",
+                "CIRCLE",
+                "ARC",
+                "ELLIPSE",
+                "SPLINE",
+                "MTEXT",
+                "DIMENSION",
+            ][..],
+        ),
         ("sample_R12.dxf", 5, &["LINE", "CIRCLE", "ARC", "TEXT"][..]),
     ] {
         let r = dxf::import(&data(name)).unwrap_or_else(|e| panic!("{name}: {e}"));
@@ -394,17 +581,36 @@ fn import_sample_files() {
         ] {
             assert!(k.contains(&m), "{name}: missing {m} in {k:?}");
         }
-        assert_eq!(k.iter().filter(|n| **n == "DIMENSION").count(), 5, "{name}: dimensions");
-        let hatch = r.document.drawing.entities.values().find_map(|e| match &e.kind {
-            EntityKind::Hatch(h) => Some(h.clone()),
-            _ => None,
-        });
+        assert_eq!(
+            k.iter().filter(|n| **n == "DIMENSION").count(),
+            5,
+            "{name}: dimensions"
+        );
+        let hatch = r
+            .document
+            .drawing
+            .entities
+            .values()
+            .find_map(|e| match &e.kind {
+                EntityKind::Hatch(h) => Some(h.clone()),
+                _ => None,
+            });
         let hatch = hatch.expect("hatch");
         assert_eq!(hatch.loops.len(), 3, "{name}: hatch loops");
         assert!(hatch.is_solid());
-        assert!(matches!(hatch.loops[1].curves[0], Curve2::Circle(_)), "{name}: full-circle arc edge → circle");
-        let layer = r.document.drawing.layer_by_name("GEOM").expect("GEOM layer");
-        assert_eq!(r.document.drawing.tables.layers[&layer].color, Color::Aci(1));
+        assert!(
+            matches!(hatch.loops[1].curves[0], Curve2::Circle(_)),
+            "{name}: full-circle arc edge → circle"
+        );
+        let layer = r
+            .document
+            .drawing
+            .layer_by_name("GEOM")
+            .expect("GEOM layer");
+        assert_eq!(
+            r.document.drawing.tables.layers[&layer].color,
+            Color::Aci(1)
+        );
         assert!(r.document.drawing.block_by_name("BOLT").is_some());
     }
 }

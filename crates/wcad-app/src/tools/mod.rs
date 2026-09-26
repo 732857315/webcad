@@ -159,7 +159,10 @@ impl Preview {
             && !self.rubber_band
     }
     pub fn clear(&mut self) {
-        *self = Preview::default();
+        self.curves.clear();
+        self.ghosts.clear();
+        self.points.clear();
+        self.rubber_band = false;
     }
 }
 

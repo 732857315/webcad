@@ -82,7 +82,10 @@ impl Term {
                 let c = u[0] * w[1] - u[1] * w[0];
                 let f = c / l;
                 // df/du = (w.y, -w.x)/L - f u / L^2 ; df/dw = (-u.y, u.x)/L
-                let gu = [w[1] / l - f * u[0] / (l * l), -w[0] / l - f * u[1] / (l * l)];
+                let gu = [
+                    w[1] / l - f * u[0] / (l * l),
+                    -w[0] / l - f * u[1] / (l * l),
+                ];
                 let gw = [-u[1] / l, u[0] / l];
                 push(grad, b, gu, coef);
                 push(grad, p, gw, coef);
@@ -115,8 +118,14 @@ impl Term {
                     (u[0] * v[0] + u[1] * v[1], v, u)
                 };
                 let f = s / luv;
-                let gu = [dsu[0] / luv - f * u[0] / (lu * lu), dsu[1] / luv - f * u[1] / (lu * lu)];
-                let gv = [dsv[0] / luv - f * v[0] / (lv * lv), dsv[1] / luv - f * v[1] / (lv * lv)];
+                let gu = [
+                    dsu[0] / luv - f * u[0] / (lu * lu),
+                    dsu[1] / luv - f * u[1] / (lu * lu),
+                ];
+                let gv = [
+                    dsv[0] / luv - f * v[0] / (lv * lv),
+                    dsv[1] / luv - f * v[1] / (lv * lv),
+                ];
                 push(grad, b, gu, coef);
                 push(grad, a, gu, -coef);
                 push(grad, d, gv, coef);
@@ -139,16 +148,26 @@ mod tests {
     fn gradients_match_finite_differences() {
         let mut s: u64 = 12345;
         let mut rnd = move || {
-            s = s.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            s = s
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
             ((s >> 11) as f64 / (1u64 << 53) as f64) * 10.0 - 5.0
         };
-        let pts = [0, 1, 2, 3].map(|i| Pt { x: 2 * i, y: 2 * i + 1 });
+        let pts = [0, 1, 2, 3].map(|i| Pt {
+            x: 2 * i,
+            y: 2 * i + 1,
+        });
         let [a, b, c, d] = pts;
         let terms = [
             Term::Var(3),
             Term::Len(a, b),
             Term::SignedDist { p: c, a, b },
-            Term::Proj { p: a, q: b, a: c, b: d },
+            Term::Proj {
+                p: a,
+                q: b,
+                a: c,
+                b: d,
+            },
             Term::Sin { a, b, c, d },
             Term::Cos { a, b, c, d },
         ];
@@ -166,7 +185,10 @@ mod tests {
                     let mut tmp = Vec::new();
                     let fd = (t.eval(&xp, 1.0, &mut tmp) - t.eval(&xm, 1.0, &mut tmp)) / (2.0 * h);
                     let an = g.iter().find(|e| e.0 == i).map_or(0.0, |e| e.1);
-                    assert!((fd - an).abs() < 1e-5 * (1.0 + fd.abs()), "{t:?} d/dx{i}: fd {fd} analytic {an}");
+                    assert!(
+                        (fd - an).abs() < 1e-5 * (1.0 + fd.abs()),
+                        "{t:?} d/dx{i}: fd {fd} analytic {an}"
+                    );
                 }
             }
         }

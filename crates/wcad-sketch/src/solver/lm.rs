@@ -8,10 +8,10 @@
 //! step becomes the minimum-W-norm Gauss-Newton step, so an under-constrained sketch moves as
 //! little as possible from its current state, and heavily weighted (dragged) parameters move least.
 
+use super::SolveOptions;
 use super::linalg::{Skyline, rcm};
 use super::system::{Equation, System};
 use super::terms::Pt;
-use super::SolveOptions;
 
 /// Connected component of the (unlocked) parameter / equation graph.
 #[derive(Clone, Debug, Default)]
@@ -98,7 +98,14 @@ pub(crate) struct Jac {
 impl Jac {
     /// Evaluate residuals and Jacobian rows. `local[p]` maps global params to local columns
     /// (`u32::MAX` = locked / not in the cluster: dropped). Returns `|F|²`.
-    pub(crate) fn eval(&mut self, eqs: &[Equation], x: &[f64], cl_eqs: &[u32], local: &[u32], grad: &mut Vec<(u32, f64)>) -> f64 {
+    pub(crate) fn eval(
+        &mut self,
+        eqs: &[Equation],
+        x: &[f64],
+        cl_eqs: &[u32],
+        local: &[u32],
+        grad: &mut Vec<(u32, f64)>,
+    ) -> f64 {
         self.f.clear();
         self.rp.clear();
         self.ri.clear();
@@ -153,7 +160,11 @@ impl Jac {
 fn envelope(dim: usize, groups: impl Iterator<Item = Vec<u32>>, pos: &[u32]) -> Vec<usize> {
     let mut first: Vec<usize> = (0..dim).collect();
     for g in groups {
-        let lo = g.iter().map(|&o| pos[o as usize] as usize).min().unwrap_or(0);
+        let lo = g
+            .iter()
+            .map(|&o| pos[o as usize] as usize)
+            .min()
+            .unwrap_or(0);
         for &o in &g {
             let p = pos[o as usize] as usize;
             if lo < first[p] {
@@ -221,11 +232,20 @@ pub(crate) struct Work {
 
 impl Work {
     pub(crate) fn new(n_params: usize) -> Self {
-        Work { local: vec![u32::MAX; n_params], ..Default::default() }
+        Work {
+            local: vec![u32::MAX; n_params],
+            ..Default::default()
+        }
     }
 }
 
-fn eval_f(eqs: &[Equation], x: &[f64], cl: &Cluster, f: &mut Vec<f64>, g: &mut Vec<(u32, f64)>) -> f64 {
+fn eval_f(
+    eqs: &[Equation],
+    x: &[f64],
+    cl: &Cluster,
+    f: &mut Vec<f64>,
+    g: &mut Vec<(u32, f64)>,
+) -> f64 {
     f.clear();
     let mut s = 0.0;
     for &k in &cl.eqs {
@@ -237,7 +257,11 @@ fn eval_f(eqs: &[Equation], x: &[f64], cl: &Cluster, f: &mut Vec<f64>, g: &mut V
 }
 
 pub(crate) fn scale_of(x: &[f64], params: &[u32]) -> f64 {
-    1.0 + params.iter().map(|&p| x[p as usize].abs()).filter(|v| v.is_finite()).fold(0.0, f64::max)
+    1.0 + params
+        .iter()
+        .map(|&p| x[p as usize].abs())
+        .filter(|v| v.is_finite())
+        .fold(0.0, f64::max)
 }
 
 /// CCW sweep of an arc in `[0, 2π)`, `None` for (near) zero radius.
@@ -248,7 +272,9 @@ fn sweep(x: &[f64], [c, s, e]: [Pt; 3]) -> Option<f64> {
     if us.0.hypot(us.1) < 1e-12 || ue.0.hypot(ue.1) < 1e-12 {
         return None;
     }
-    Some(wcad_math::normalize_0_2pi(ue.1.atan2(ue.0) - us.1.atan2(us.0)))
+    Some(wcad_math::normalize_0_2pi(
+        ue.1.atan2(ue.0) - us.1.atan2(us.0),
+    ))
 }
 
 /// Result of one cluster solve.
@@ -282,9 +308,13 @@ pub(crate) fn solve_cluster(
     w.jac.transpose(n);
     // Structure of J is fixed during the solve: pick the ordering once.
     let groups: Vec<Vec<u32>> = if dual {
-        (0..n).map(|c| w.jac.ci[w.jac.cp[c]..w.jac.cp[c + 1]].to_vec()).collect()
+        (0..n)
+            .map(|c| w.jac.ci[w.jac.cp[c]..w.jac.cp[c + 1]].to_vec())
+            .collect()
     } else {
-        (0..m).map(|i| w.jac.ri[w.jac.rp[i]..w.jac.rp[i + 1]].to_vec()).collect()
+        (0..m)
+            .map(|i| w.jac.ri[w.jac.rp[i]..w.jac.rp[i + 1]].to_vec())
+            .collect()
     };
     let (pos, first) = ordering(dim, &groups);
     drop(groups);
@@ -383,13 +413,20 @@ pub(crate) fn solve_cluster(
             for (j, &p) in cl.params.iter().enumerate() {
                 x[p as usize] = w.x0[j] + w.dx[j];
             }
-            let flips = arcs.iter().zip(&sweeps).any(|(&a, &s0)| match (s0, sweep(x, a)) {
-                (Some(s0), Some(s1)) => (s1 - s0).abs() > std::f64::consts::PI,
-                _ => false,
-            });
+            let flips = arcs
+                .iter()
+                .zip(&sweeps)
+                .any(|(&a, &s0)| match (s0, sweep(x, a)) {
+                    (Some(s0), Some(s1)) => (s1 - s0).abs() > std::f64::consts::PI,
+                    _ => false,
+                });
             let nt = eval_f(eqs, x, cl, &mut w.ft, &mut w.grad);
             if !flips && nt.is_finite() && nt < norm2 {
-                stall = if nt > norm2 * (1.0 - 1e-9) { stall + 1 } else { 0 };
+                stall = if nt > norm2 * (1.0 - 1e-9) {
+                    stall + 1
+                } else {
+                    0
+                };
                 norm2 = nt;
                 mu = (mu * 0.1).max(1e-14);
                 accepted = true;
@@ -410,7 +447,12 @@ pub(crate) fn solve_cluster(
     for &p in &cl.params {
         w.local[p as usize] = u32::MAX;
     }
-    ClusterResult { converged, iterations: iters, max_residual, norm2 }
+    ClusterResult {
+        converged,
+        iterations: iters,
+        max_residual,
+        norm2,
+    }
 }
 
 #[cfg(test)]
@@ -424,7 +466,9 @@ mod tests {
         let mut label: Vec<u32> = (0..dim as u32).collect();
         let mut s: u64 = 3;
         for i in (1..dim).rev() {
-            s = s.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            s = s
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
             label.swap(i, (s >> 33) as usize % (i + 1));
         }
         let groups: Vec<Vec<u32>> = (0..dim - 1).map(|i| vec![label[i], label[i + 1]]).collect();

@@ -4,24 +4,32 @@ Launches Chrome with a DevTools port, opens URL, prints console messages and exc
 seconds, saves a PNG screenshot via CDP `Page.captureScreenshot` and prints the page state
 (loading indicator, error box, canvas size, service worker).
 
-    cargo xtask web && cargo xtask serve --port 8765 &
+    cargo xtask web
+    cargo xtask serve --port 8765  # run in a separate terminal
     python xtask/scripts/cdp_shot.py <chrome> <profile-dir> http://127.0.0.1:8765/ shot.png 20         --use-angle=swiftshader --enable-unsafe-swiftshader
 
 Notes: --no-sandbox is always passed (a portable Chrome cannot use its sandbox); keep the profile
-directory between runs (a throwaway dir outside the repo); do not use Chrome's own --screenshot flag
+directory between runs (a throwaway or git-ignored directory); do not use Chrome's own --screenshot flag
 (it hangs with a live WebGL/WebGPU canvas). Env: CDP_PORT (default 9347), DRAG=1 to send a mouse drag
-and wheel before the screenshot.
+and wheel before the screenshot. CLICK=x,y (or multiple x,y pairs separated by semicolons) clicks
+UI controls after loading. VIEWPORT=390x844 sets an exact CSS viewport; MOBILE=1 enables
+mobile/touch emulation. OFFLINE=1 reloads through the installed service worker without the network.
+Fails on JavaScript exceptions, console errors, a stuck loader, an error box or an empty canvas.
 """
 import base64, json, os, socket, struct, subprocess, sys, time, urllib.request
 
 PAGE_JS = """(() => { const c = document.getElementById('webcad_canvas'); const e = document.getElementById('error');
-  return 'loading=' + !!document.getElementById('loading') + ' | error_hidden=' + (e ? e.hidden : 'n/a') +
-    ' | error_text=' + (document.getElementById('error_text') || {}).textContent + ' | canvas ' + (c ? c.width + 'x' + c.height : 'none') +
-    ' | gpu=' + !!navigator.gpu + ' | sw=' + !!(navigator.serviceWorker && navigator.serviceWorker.controller) +
-    ' | preload=' + [...document.querySelectorAll('link[rel=modulepreload]')].map(l => l.href).join(','); })()"""
+  return {loading: !!document.getElementById('loading'), error_hidden: !!e && e.hidden,
+    error_text: document.getElementById('error_text')?.textContent || '',
+    width: c?.width || 0, height: c?.height || 0, gpu: !!navigator.gpu,
+    sw: !!(navigator.serviceWorker && navigator.serviceWorker.controller),
+    preload: [...document.querySelectorAll('link[rel=modulepreload]')].map(l => l.href)}; })()"""
+if len(sys.argv) < 6:
+    raise SystemExit("usage: cdp_shot.py <chrome> <profile-dir> <url> <shot.png> <wait-seconds> [chrome-flags]")
 chrome, profile, url, out, wait = sys.argv[1:6]
 extra = sys.argv[6:]
 port = int(os.environ.get("CDP_PORT", "9347"))
+errors = []
 p = subprocess.Popen([chrome, "--headless=new", "--no-sandbox", f"--remote-debugging-port={port}",
                       f"--user-data-dir={profile}", "--window-size=1280,800", "--no-first-run",
                       "--no-default-browser-check", "--disable-extensions", *extra, "about:blank"],
@@ -29,9 +37,14 @@ p = subprocess.Popen([chrome, "--headless=new", "--no-sandbox", f"--remote-debug
 try:
     for _ in range(100):
         try:
-            tabs = json.load(urllib.request.urlopen(f"http://127.0.0.1:{port}/json/list", timeout=1)); break
-        except Exception: time.sleep(0.2)
-    ws_url = next(t["webSocketDebuggerUrl"] for t in tabs if t["type"] == "page")
+            tabs = json.load(urllib.request.urlopen(f"http://127.0.0.1:{port}/json/list", timeout=1))
+            pages = [t for t in tabs if t.get("type") == "page" and t.get("webSocketDebuggerUrl")]
+            if pages: break
+        except (OSError, ValueError): pass
+        time.sleep(0.2)
+    else:
+        raise RuntimeError("Chrome did not create a DevTools page within 20 seconds")
+    ws_url = pages[0]["webSocketDebuggerUrl"]
     host_port, path = ws_url[len("ws://"):].split("/", 1)
     s = socket.create_connection(("127.0.0.1", port)); s.settimeout(120)
     key = base64.b64encode(os.urandom(16)).decode()
@@ -61,17 +74,34 @@ try:
     msg_id = [0]
     def call(method, **params):
         msg_id[0] += 1; send({"id": msg_id[0], "method": method, "params": params})
+        request_id = msg_id[0]
         while True:
             r = recv_msg()
-            if r.get("id") == msg_id[0]: return r
+            if r.get("id") == request_id:
+                if "error" in r: raise RuntimeError(f"{method}: {r['error']}")
+                return r
             log_event(r)
     def log_event(r):
         m = r.get("method")
         if m == "Runtime.consoleAPICalled":
             print("console." + r["params"]["type"] + ":", " ".join(str(a.get("value", a.get("description", ""))) for a in r["params"]["args"])[:400])
+            if r["params"]["type"] == "error": errors.append("console.error")
         elif m == "Runtime.exceptionThrown":
             print("EXCEPTION:", json.dumps(r["params"]["exceptionDetails"])[:600])
-    call("Runtime.enable"); call("Page.enable")
+            errors.append("JavaScript exception")
+        elif m == "Log.entryAdded" and r["params"]["entry"].get("level") == "error":
+            print("browser.error:", r["params"]["entry"].get("text", "")[:600])
+            errors.append("browser resource error")
+        elif m == "Page.javascriptDialogOpening" and r["params"].get("type") == "beforeunload":
+            # Only discard the throwaway test page; other dialogs remain visible as test failures.
+            msg_id[0] += 1
+            send({"id": msg_id[0], "method": "Page.handleJavaScriptDialog", "params": {"accept": True}})
+    call("Runtime.enable"); call("Page.enable"); call("Log.enable")
+    if os.environ.get("VIEWPORT"):
+        width, height = map(int, os.environ["VIEWPORT"].lower().split("x"))
+        mobile = os.environ.get("MOBILE") == "1"
+        call("Emulation.setDeviceMetricsOverride", width=width, height=height, deviceScaleFactor=1, mobile=mobile)
+        call("Emulation.setTouchEmulationEnabled", enabled=mobile)
     call("Page.navigate", url=url)
     t_end = time.time() + float(wait)
     s.settimeout(0.5)
@@ -79,6 +109,27 @@ try:
         try: log_event(recv_msg())
         except (socket.timeout, TimeoutError): pass
     s.settimeout(120)
+    if os.environ.get("OFFLINE") == "1":
+        state = call("Runtime.evaluate", expression=PAGE_JS, returnByValue=True)["result"]["result"].get("value", {})
+        if not state.get("sw"): raise RuntimeError("No active service worker for offline reload")
+        call("Network.enable")
+        call("Network.emulateNetworkConditions", offline=True, latency=0, downloadThroughput=0, uploadThroughput=0)
+        call("Page.reload", ignoreCache=True)
+        t_end = time.time() + float(wait); s.settimeout(0.5)
+        while time.time() < t_end:
+            try: log_event(recv_msg())
+            except (socket.timeout, TimeoutError): pass
+        s.settimeout(120)
+    for point in filter(None, os.environ.get("CLICK", "").split(";")):
+        x, y = map(float, point.split(","))
+        call("Input.dispatchMouseEvent", type="mouseMoved", x=x, y=y)
+        call("Input.dispatchMouseEvent", type="mousePressed", x=x, y=y, button="left", clickCount=1, buttons=1)
+        call("Input.dispatchMouseEvent", type="mouseReleased", x=x, y=y, button="left", clickCount=1)
+        t_end = time.time() + 2; s.settimeout(0.5)
+        while time.time() < t_end:
+            try: log_event(recv_msg())
+            except (socket.timeout, TimeoutError): pass
+        s.settimeout(120)
     if os.environ.get("DRAG"):  # orbit: left-drag in the viewport, then wheel-zoom in
         call("Input.dispatchMouseEvent", type="mouseMoved", x=500, y=400)
         call("Input.dispatchMouseEvent", type="mousePressed", x=500, y=400, button="left", clickCount=1, buttons=1)
@@ -96,6 +147,30 @@ try:
     open(out, "wb").write(base64.b64decode(r["result"]["data"]))
     print("screenshot", out, os.path.getsize(out), "bytes")
     ev = call("Runtime.evaluate", expression=PAGE_JS, returnByValue=True)
-    print("page:", ev["result"]["result"].get("value"))
+    state = ev["result"]["result"].get("value", {})
+    print("page:", json.dumps(state, ensure_ascii=False))
+    if errors or state.get("loading", True) or not state.get("error_hidden") or state.get("error_text") or state.get("width", 0) <= 0 or state.get("height", 0) <= 0:
+        raise SystemExit("Web smoke test failed: " + ", ".join(errors or ["invalid page state"]))
 finally:
-    p.kill()
+    if p.poll() is None:
+        try:
+            if "call" in globals():
+                s.settimeout(5)
+                call("Page.navigate", url="about:blank")
+                call("Browser.close")
+        except (OSError, EOFError, RuntimeError):
+            pass
+        try:
+            p.wait(timeout=15)
+        except subprocess.TimeoutExpired:
+            try:
+                if os.name == "nt":
+                    subprocess.run(["taskkill", "/PID", str(p.pid), "/T", "/F"],
+                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                   timeout=15, check=False)
+                else:
+                    p.kill()
+                p.wait(timeout=10)
+            except (OSError, subprocess.TimeoutExpired) as error:
+                # Teardown must not replace a page assertion failure or report it as a load error.
+                print(f"warning: Chrome cleanup for PID {p.pid}: {error}", file=sys.stderr)

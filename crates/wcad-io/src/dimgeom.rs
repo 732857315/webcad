@@ -35,13 +35,21 @@ fn angle_of(v: DVec2) -> f64 {
 /// Rotate text so it never reads upside down. Returns (angle, flipped).
 fn readable(a: f64) -> (f64, bool) {
     let a = normalize_pi(a);
-    if a > FRAC_PI_2 + 1e-9 || a <= -FRAC_PI_2 + 1e-9 { (normalize_pi(a + PI), true) } else { (a, false) }
+    if a > FRAC_PI_2 + 1e-9 || a <= -FRAC_PI_2 + 1e-9 {
+        (normalize_pi(a + PI), true)
+    } else {
+        (a, false)
+    }
 }
 
 /// The measured value: a length, or an angle in radians for angular dimensions.
 pub(crate) fn measure(kind: &DimKind) -> f64 {
     match kind {
-        DimKind::Linear { p1, p2, rotation, .. } => (*p2 - *p1).dot(DVec2::new(rotation.cos(), rotation.sin())).abs(),
+        DimKind::Linear {
+            p1, p2, rotation, ..
+        } => (*p2 - *p1)
+            .dot(DVec2::new(rotation.cos(), rotation.sin()))
+            .abs(),
         DimKind::Aligned { p1, p2, .. } => p1.distance(*p2),
         DimKind::Radius { center, point } => center.distance(*point),
         DimKind::Diameter { center, point } => 2.0 * center.distance(*point),
@@ -51,7 +59,12 @@ pub(crate) fn measure(kind: &DimKind) -> f64 {
             let s = ccw_sweep(a1, a2);
             if s >= std::f64::consts::TAU { 0.0 } else { s }
         }
-        DimKind::Ordinate { origin, point, x_axis, .. } => {
+        DimKind::Ordinate {
+            origin,
+            point,
+            x_axis,
+            ..
+        } => {
             if *x_axis {
                 (point.x - origin.x).abs()
             } else {
@@ -66,7 +79,11 @@ pub(crate) fn measure(kind: &DimKind) -> f64 {
 pub(crate) fn text(dim: &Dimension, style: &DimStyle) -> String {
     let v = measure(&dim.kind);
     let num = match dim.kind {
-        DimKind::Angular { .. } => format!("{:.*}\u{00B0}", style.angle_decimals as usize, v.to_degrees()),
+        DimKind::Angular { .. } => format!(
+            "{:.*}\u{00B0}",
+            style.angle_decimals as usize,
+            v.to_degrees()
+        ),
         _ => format!("{:.*}", style.decimals as usize, v),
     };
     let lead = match dim.kind {
@@ -93,7 +110,11 @@ fn arrow(tip: DVec2, dir: DVec2, size: f64) -> [DVec2; 3] {
 
 /// Graphics for a dimension. `None` for degenerate input.
 pub(crate) fn build(dim: &Dimension, style: &DimStyle) -> Option<DimGraphics> {
-    let s = if style.scale.is_finite() && style.scale > 0.0 { style.scale } else { 1.0 };
+    let s = if style.scale.is_finite() && style.scale > 0.0 {
+        style.scale
+    } else {
+        1.0
+    };
     let asz = style.arrow_size * s;
     let th = style.text_height * s;
     let exo = style.ext_offset * s;
@@ -111,11 +132,36 @@ pub(crate) fn build(dim: &Dimension, style: &DimStyle) -> Option<DimGraphics> {
         valign: VAlign::Bottom,
     };
     match dim.kind {
-        DimKind::Linear { p1, p2, line_point, rotation } => {
-            linear(&mut g, p1, p2, line_point, DVec2::new(rotation.cos(), rotation.sin()), asz, exo, exe, gap)?;
+        DimKind::Linear {
+            p1,
+            p2,
+            line_point,
+            rotation,
+        } => {
+            linear(
+                &mut g,
+                p1,
+                p2,
+                line_point,
+                DVec2::new(rotation.cos(), rotation.sin()),
+                asz,
+                exo,
+                exe,
+                gap,
+            )?;
         }
         DimKind::Aligned { p1, p2, line_point } => {
-            linear(&mut g, p1, p2, line_point, unit(p2 - p1)?, asz, exo, exe, gap)?;
+            linear(
+                &mut g,
+                p1,
+                p2,
+                line_point,
+                unit(p2 - p1)?,
+                asz,
+                exo,
+                exe,
+                gap,
+            )?;
         }
         DimKind::Radius { center, point } => {
             let u = unit(point - center)?;
@@ -131,7 +177,12 @@ pub(crate) fn build(dim: &Dimension, style: &DimStyle) -> Option<DimGraphics> {
             g.arrows.push(arrow(a, -u, asz));
             place_along(&mut g, center, angle_of(u), gap);
         }
-        DimKind::Angular { vertex, p1, p2, arc_point } => {
+        DimKind::Angular {
+            vertex,
+            p1,
+            p2,
+            arc_point,
+        } => {
             let u1 = unit(p1 - vertex)?;
             let u2 = unit(p2 - vertex)?;
             let mut r = arc_point.distance(vertex);
@@ -144,8 +195,10 @@ pub(crate) fn build(dim: &Dimension, style: &DimStyle) -> Option<DimGraphics> {
             g.arcs.push(Arc2::new(vertex, r, a1, a2));
             let t1 = vertex + u1 * r;
             let t2 = vertex + u2 * r;
-            g.arrows.push(arrow(t1, DVec2::new(a1.sin(), -a1.cos()), asz));
-            g.arrows.push(arrow(t2, DVec2::new(-a2.sin(), a2.cos()), asz));
+            g.arrows
+                .push(arrow(t1, DVec2::new(a1.sin(), -a1.cos()), asz));
+            g.arrows
+                .push(arrow(t2, DVec2::new(-a2.sin(), a2.cos()), asz));
             for (p, u) in [(p1, u1), (p2, u2)] {
                 let d = p.distance(vertex);
                 if d + exo < r {
@@ -159,12 +212,19 @@ pub(crate) fn build(dim: &Dimension, style: &DimStyle) -> Option<DimGraphics> {
             // Text sits outside the arc: its bottom faces the vertex unless flipped.
             let outward = DVec2::new(am.cos(), am.sin());
             let up = perp(DVec2::new(rot.cos(), rot.sin()));
-            g.valign = if up.dot(outward) >= 0.0 { VAlign::Bottom } else { VAlign::Top };
+            g.valign = if up.dot(outward) >= 0.0 {
+                VAlign::Bottom
+            } else {
+                VAlign::Top
+            };
         }
-        DimKind::Ordinate { point, leader_end, .. } => {
+        DimKind::Ordinate {
+            point, leader_end, ..
+        } => {
             let d = leader_end - point;
             let u = unit(d).unwrap_or(DVec2::X);
-            g.lines.push((point + u * exo.min(d.length() * 0.5), leader_end));
+            g.lines
+                .push((point + u * exo.min(d.length() * 0.5), leader_end));
             let (rot, flipped) = readable(angle_of(u));
             g.text_pos = leader_end + u * gap;
             g.text_rotation = rot;
@@ -224,9 +284,16 @@ fn place_along(g: &mut DimGraphics, mid: DVec2, a: f64, gap: f64) {
 
 /// Where the text goes when the user has not moved it (used for DXF text midpoints).
 pub(crate) fn default_text_pos(dim: &Dimension, style: &DimStyle) -> DVec2 {
-    let auto = Dimension { text_pos: None, ..dim.clone() };
+    let auto = Dimension {
+        text_pos: None,
+        ..dim.clone()
+    };
     match build(&auto, style) {
-        Some(g) => g.text_pos + perp(DVec2::new(g.text_rotation.cos(), g.text_rotation.sin())) * (g.text_height * 0.5),
+        Some(g) => {
+            g.text_pos
+                + perp(DVec2::new(g.text_rotation.cos(), g.text_rotation.sin()))
+                    * (g.text_height * 0.5)
+        }
         None => match dim.kind {
             DimKind::Linear { line_point, .. } | DimKind::Aligned { line_point, .. } => line_point,
             DimKind::Radius { point, .. } | DimKind::Diameter { point, .. } => point,
@@ -260,7 +327,10 @@ mod tests {
         assert_eq!(g.lines.len(), 3);
         assert_eq!(g.arrows.len(), 2);
         assert!((g.text_pos.y - (8.0 + style.text_gap)).abs() < 1e-12);
-        let o = Dimension { text_override: Some("L=<> mm".into()), ..dim };
+        let o = Dimension {
+            text_override: Some("L=<> mm".into()),
+            ..dim
+        };
         assert_eq!(text(&o, &style), "L=10.00 mm");
         let ang = Dimension {
             kind: DimKind::Angular {
@@ -272,6 +342,15 @@ mod tests {
             ..o
         };
         assert!((measure(&ang.kind) - FRAC_PI_2).abs() < 1e-12);
-        assert_eq!(text(&Dimension { text_override: None, ..ang }, &style), "90°");
+        assert_eq!(
+            text(
+                &Dimension {
+                    text_override: None,
+                    ..ang
+                },
+                &style
+            ),
+            "90°"
+        );
     }
 }

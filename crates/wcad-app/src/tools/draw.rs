@@ -78,7 +78,7 @@ pub fn register(r: &mut CommandRegistry) {
         "PLINE",
         &["PL"],
         |l| strings_of(l).cmd_pline,
-        "⌇",
+        "∟",
         "core",
         || Box::new(PlineTool::default()),
     ));
@@ -86,7 +86,7 @@ pub fn register(r: &mut CommandRegistry) {
         "ARC",
         &["A"],
         |l| strings_of(l).cmd_arc,
-        "◠",
+        "⌒",
         "core",
         || Box::new(ArcTool::default()),
     ));
@@ -94,7 +94,7 @@ pub fn register(r: &mut CommandRegistry) {
         "RECTANG",
         &["REC", "RECTANGLE"],
         |l| strings_of(l).cmd_rectang,
-        "▭",
+        "□",
         "shapes",
         || Box::new(RectTool::default()),
     ));
@@ -102,7 +102,7 @@ pub fn register(r: &mut CommandRegistry) {
         "POLYGON",
         &["POL"],
         |l| strings_of(l).cmd_polygon,
-        "⬡",
+        "◇",
         "shapes",
         || Box::new(PolygonTool::default()),
     ));
@@ -110,7 +110,7 @@ pub fn register(r: &mut CommandRegistry) {
         "ELLIPSE",
         &["EL"],
         |l| strings_of(l).cmd_ellipse,
-        "⬭",
+        "( )",
         "shapes",
         || Box::new(EllipseTool::default()),
     ));
@@ -118,7 +118,7 @@ pub fn register(r: &mut CommandRegistry) {
         "SPLINE",
         &["SPL"],
         |l| strings_of(l).cmd_spline,
-        "∿",
+        "~",
         "curves",
         || Box::new(SplineTool::default()),
     ));
@@ -142,7 +142,7 @@ pub fn register(r: &mut CommandRegistry) {
         "REVCLOUD",
         &[],
         |l| strings_of(l).cmd_revcloud,
-        "☁",
+        "~~",
         "curves",
         || Box::new(RevcloudTool::default()),
     ));

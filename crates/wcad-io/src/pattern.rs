@@ -17,7 +17,12 @@ pub(crate) struct PatLine {
 }
 
 fn l(angle: f64, bx: f64, by: f64, dx: f64, dy: f64, dashes: &[f64]) -> PatLine {
-    PatLine { angle_deg: angle, base: DVec2::new(bx, by), offset: DVec2::new(dx, dy), dashes: dashes.to_vec() }
+    PatLine {
+        angle_deg: angle,
+        base: DVec2::new(bx, by),
+        offset: DVec2::new(dx, dy),
+        dashes: dashes.to_vec(),
+    }
 }
 
 /// Definition lines for a named pattern (case-insensitive). `None` for SOLID and unknown names.
@@ -25,8 +30,14 @@ pub(crate) fn builtin(name: &str) -> Option<Vec<PatLine>> {
     let n = name.to_ascii_uppercase();
     Some(match n.as_str() {
         "ANSI31" => vec![l(45.0, 0.0, 0.0, 0.0, 3.175, &[])],
-        "ANSI32" => vec![l(45.0, 0.0, 0.0, 0.0, 9.525, &[]), l(45.0, 4.490128, 0.0, 0.0, 9.525, &[])],
-        "ANSI33" => vec![l(45.0, 0.0, 0.0, 0.0, 6.35, &[]), l(45.0, 4.490128, 0.0, 0.0, 6.35, &[3.175, -1.5875])],
+        "ANSI32" => vec![
+            l(45.0, 0.0, 0.0, 0.0, 9.525, &[]),
+            l(45.0, 4.490128, 0.0, 0.0, 9.525, &[]),
+        ],
+        "ANSI33" => vec![
+            l(45.0, 0.0, 0.0, 0.0, 6.35, &[]),
+            l(45.0, 4.490128, 0.0, 0.0, 6.35, &[3.175, -1.5875]),
+        ],
         "ANSI34" => vec![
             l(45.0, 0.0, 0.0, 0.0, 19.05, &[]),
             l(45.0, 4.490128, 0.0, 0.0, 19.05, &[]),
@@ -34,13 +45,39 @@ pub(crate) fn builtin(name: &str) -> Option<Vec<PatLine>> {
             l(45.0, 13.470384, 0.0, 0.0, 19.05, &[]),
         ],
         "ANSI35" => {
-            vec![l(45.0, 0.0, 0.0, 0.0, 6.35, &[]), l(45.0, 4.490128, 0.0, 0.0, 6.35, &[7.9375, -1.5875, 0.0, -1.5875])]
+            vec![
+                l(45.0, 0.0, 0.0, 0.0, 6.35, &[]),
+                l(
+                    45.0,
+                    4.490128,
+                    0.0,
+                    0.0,
+                    6.35,
+                    &[7.9375, -1.5875, 0.0, -1.5875],
+                ),
+            ]
         }
-        "ANSI36" => vec![l(45.0, 0.0, 0.0, 5.55625, 3.175, &[7.9375, -1.5875, 0.0, -1.5875])],
-        "ANSI37" => vec![l(45.0, 0.0, 0.0, 0.0, 3.175, &[]), l(135.0, 0.0, 0.0, 0.0, 3.175, &[])],
-        "ANSI38" => vec![l(45.0, 0.0, 0.0, 0.0, 3.175, &[]), l(135.0, 0.0, 0.0, 6.35, 3.175, &[7.9375, -4.7625])],
+        "ANSI36" => vec![l(
+            45.0,
+            0.0,
+            0.0,
+            5.55625,
+            3.175,
+            &[7.9375, -1.5875, 0.0, -1.5875],
+        )],
+        "ANSI37" => vec![
+            l(45.0, 0.0, 0.0, 0.0, 3.175, &[]),
+            l(135.0, 0.0, 0.0, 0.0, 3.175, &[]),
+        ],
+        "ANSI38" => vec![
+            l(45.0, 0.0, 0.0, 0.0, 3.175, &[]),
+            l(135.0, 0.0, 0.0, 6.35, 3.175, &[7.9375, -4.7625]),
+        ],
         "LINE" => vec![l(0.0, 0.0, 0.0, 0.0, 3.175, &[])],
-        "NET" => vec![l(0.0, 0.0, 0.0, 0.0, 3.175, &[]), l(90.0, 0.0, 0.0, 0.0, 3.175, &[])],
+        "NET" => vec![
+            l(0.0, 0.0, 0.0, 0.0, 3.175, &[]),
+            l(90.0, 0.0, 0.0, 0.0, 3.175, &[]),
+        ],
         "NET3" => vec![
             l(0.0, 0.0, 0.0, 0.0, 3.175, &[]),
             l(60.0, 0.0, 0.0, 0.0, 3.175, &[]),
@@ -48,17 +85,26 @@ pub(crate) fn builtin(name: &str) -> Option<Vec<PatLine>> {
         ],
         "DOTS" => vec![l(0.0, 0.0, 0.0, 0.79375, 1.5875, &[0.0, -1.5875])],
         "SQUARE" => {
-            vec![l(0.0, 0.0, 0.0, 0.0, 3.175, &[3.175, -3.175]), l(90.0, 0.0, 0.0, 0.0, 3.175, &[3.175, -3.175])]
+            vec![
+                l(0.0, 0.0, 0.0, 0.0, 3.175, &[3.175, -3.175]),
+                l(90.0, 0.0, 0.0, 0.0, 3.175, &[3.175, -3.175]),
+            ]
         }
         "CROSS" => {
-            vec![l(0.0, 0.0, 0.0, 6.35, 6.35, &[3.175, -9.525]), l(90.0, 1.5875, -1.5875, 6.35, 6.35, &[3.175, -9.525])]
+            vec![
+                l(0.0, 0.0, 0.0, 6.35, 6.35, &[3.175, -9.525]),
+                l(90.0, 1.5875, -1.5875, 6.35, 6.35, &[3.175, -9.525]),
+            ]
         }
         "BRICK" => vec![
             l(0.0, 0.0, 0.0, 0.0, 6.35, &[]),
             l(90.0, 0.0, 0.0, 6.35, 6.35, &[6.35, -6.35]),
             l(90.0, 6.35, 0.0, 6.35, 6.35, &[-6.35, 6.35]),
         ],
-        "GRATE" => vec![l(0.0, 0.0, 0.0, 0.0, 0.79375, &[]), l(90.0, 0.0, 0.0, 0.0, 3.175, &[])],
+        "GRATE" => vec![
+            l(0.0, 0.0, 0.0, 0.0, 0.79375, &[]),
+            l(90.0, 0.0, 0.0, 0.0, 3.175, &[]),
+        ],
         "EARTH" => vec![
             l(0.0, 0.0, 0.0, 6.35, 6.35, &[6.35, -6.35]),
             l(0.0, 0.0, 2.38125, 6.35, 6.35, &[6.35, -6.35]),
@@ -89,8 +135,13 @@ pub(crate) struct Family {
 
 /// Families for a pattern at a hatch angle (radians) and scale.
 pub(crate) fn families(lines: &[PatLine], angle: f64, scale: f64) -> Vec<Family> {
-    let scale = if scale.is_finite() && scale > 0.0 { scale } else { 1.0 };
-    let rot = |v: DVec2, a: f64| DVec2::new(v.x * a.cos() - v.y * a.sin(), v.x * a.sin() + v.y * a.cos());
+    let scale = if scale.is_finite() && scale > 0.0 {
+        scale
+    } else {
+        1.0
+    };
+    let rot =
+        |v: DVec2, a: f64| DVec2::new(v.x * a.cos() - v.y * a.sin(), v.x * a.sin() + v.y * a.cos());
     lines
         .iter()
         .map(|pl| {
@@ -168,7 +219,9 @@ pub(crate) fn hatch_segments(polys: &[Vec<DVec2>], fams: &[Family]) -> Vec<(DVec
                 if f.dashes.is_empty() {
                     out.push((to_world(pair[0]), to_world(pair[1])));
                 } else {
-                    dash_segment(pair[0], pair[1], phase, &f.dashes, &mut |a, b| out.push((to_world(a), to_world(b))));
+                    dash_segment(pair[0], pair[1], phase, &f.dashes, &mut |a, b| {
+                        out.push((to_world(a), to_world(b)))
+                    });
                 }
                 if out.len() > MAX_SEGMENTS {
                     return out;

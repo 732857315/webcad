@@ -12,11 +12,23 @@ pub struct Plane {
 
 impl Plane {
     /// World XY plane (Top view), normal +Z.
-    pub const XY: Self = Self { origin: DVec3::ZERO, x_axis: DVec3::X, y_axis: DVec3::Y };
+    pub const XY: Self = Self {
+        origin: DVec3::ZERO,
+        x_axis: DVec3::X,
+        y_axis: DVec3::Y,
+    };
     /// World XZ plane (Front view), normal -Y (right-handed: X × Z = -Y).
-    pub const XZ: Self = Self { origin: DVec3::ZERO, x_axis: DVec3::X, y_axis: DVec3::Z };
+    pub const XZ: Self = Self {
+        origin: DVec3::ZERO,
+        x_axis: DVec3::X,
+        y_axis: DVec3::Z,
+    };
     /// World YZ plane (Right view), normal +X.
-    pub const YZ: Self = Self { origin: DVec3::ZERO, x_axis: DVec3::Y, y_axis: DVec3::Z };
+    pub const YZ: Self = Self {
+        origin: DVec3::ZERO,
+        x_axis: DVec3::Y,
+        y_axis: DVec3::Z,
+    };
 
     /// Build a plane from an origin and normal, choosing a stable in-plane X axis.
     pub fn from_normal(origin: DVec3, normal: DVec3) -> Self {
@@ -24,7 +36,11 @@ impl Plane {
         let helper = if n.z.abs() < 0.9 { DVec3::Z } else { DVec3::X };
         let x_axis = helper.cross(n).normalize();
         let y_axis = n.cross(x_axis);
-        Self { origin, x_axis, y_axis }
+        Self {
+            origin,
+            x_axis,
+            y_axis,
+        }
     }
 
     /// Build a plane from origin, x direction and a vector roughly along +y (re-orthogonalized).
@@ -32,7 +48,11 @@ impl Plane {
         let x_axis = x_dir.try_normalize()?;
         let n = x_axis.cross(y_hint).try_normalize()?;
         let y_axis = n.cross(x_axis);
-        Some(Self { origin, x_axis, y_axis })
+        Some(Self {
+            origin,
+            x_axis,
+            y_axis,
+        })
     }
 
     pub fn normal(&self) -> DVec3 {
@@ -55,12 +75,18 @@ impl Plane {
     }
 
     pub fn offset(&self, d: f64) -> Self {
-        Self { origin: self.origin + self.normal() * d, ..*self }
+        Self {
+            origin: self.origin + self.normal() * d,
+            ..*self
+        }
     }
 
     /// Plane-local → world transform (local z = normal).
     pub fn to_world_affine(&self) -> DAffine3 {
-        DAffine3::from_mat3_translation(DMat3::from_cols(self.x_axis, self.y_axis, self.normal()), self.origin)
+        DAffine3::from_mat3_translation(
+            DMat3::from_cols(self.x_axis, self.y_axis, self.normal()),
+            self.origin,
+        )
     }
 
     /// Intersect a ray with the plane; returns the ray parameter.

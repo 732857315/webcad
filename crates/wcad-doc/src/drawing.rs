@@ -24,7 +24,13 @@ pub struct DrawingSettings {
 
 impl Default for DrawingSettings {
     fn default() -> Self {
-        Self { ltscale: 1.0, grid_spacing: 10.0, snap_spacing: 1.0, display_decimals: 4, point_size_px: 5.0 }
+        Self {
+            ltscale: 1.0,
+            grid_spacing: 10.0,
+            snap_spacing: 1.0,
+            display_decimals: 4,
+            point_size_px: 5.0,
+        }
     }
 }
 
@@ -65,13 +71,32 @@ impl Drawing {
         linetypes.insert(continuous, Linetype::continuous());
         for (name, desc, pattern) in [
             ("DASHED", "Dashed __ __ __", vec![12.7, -6.35]),
-            ("CENTER", "Center ____ _ ____ _", vec![31.75, -6.35, 6.35, -6.35]),
+            (
+                "CENTER",
+                "Center ____ _ ____ _",
+                vec![31.75, -6.35, 6.35, -6.35],
+            ),
             ("HIDDEN", "Hidden __ __ __", vec![6.35, -3.175]),
-            ("PHANTOM", "Phantom ____ _ _ ____", vec![31.75, -6.35, 6.35, -6.35, 6.35, -6.35]),
+            (
+                "PHANTOM",
+                "Phantom ____ _ _ ____",
+                vec![31.75, -6.35, 6.35, -6.35, 6.35, -6.35],
+            ),
             ("DOT", "Dot . . . .", vec![0.0, -6.35]),
-            ("DASHDOT", "Dash dot __ . __ .", vec![12.7, -6.35, 0.0, -6.35]),
+            (
+                "DASHDOT",
+                "Dash dot __ . __ .",
+                vec![12.7, -6.35, 0.0, -6.35],
+            ),
         ] {
-            linetypes.insert(ids.linetype(), Linetype { name: name.into(), description: desc.into(), pattern });
+            linetypes.insert(
+                ids.linetype(),
+                Linetype {
+                    name: name.into(),
+                    description: desc.into(),
+                    pattern,
+                },
+            );
         }
 
         let layer0 = ids.layer();
@@ -94,7 +119,13 @@ impl Drawing {
         let mut text_styles = IndexMap::new();
         text_styles.insert(
             standard_text,
-            TextStyle { name: "Standard".into(), font: "default".into(), height: 0.0, width_factor: 1.0, oblique: 0.0 },
+            TextStyle {
+                name: "Standard".into(),
+                font: "default".into(),
+                height: 0.0,
+                width_factor: 1.0,
+                oblique: 0.0,
+            },
         );
 
         let standard_dim = ids.dim_style();
@@ -122,19 +153,31 @@ impl Drawing {
     }
 
     pub fn layer_by_name(&self, name: &str) -> Option<LayerId> {
-        self.tables.layers.iter().find(|(_, l)| l.name.eq_ignore_ascii_case(name)).map(|(&id, _)| id)
+        self.tables
+            .layers
+            .iter()
+            .find(|(_, l)| l.name.eq_ignore_ascii_case(name))
+            .map(|(&id, _)| id)
     }
 
     pub fn linetype_by_name(&self, name: &str) -> Option<LinetypeId> {
-        self.tables.linetypes.iter().find(|(_, l)| l.name.eq_ignore_ascii_case(name)).map(|(&id, _)| id)
+        self.tables
+            .linetypes
+            .iter()
+            .find(|(_, l)| l.name.eq_ignore_ascii_case(name))
+            .map(|(&id, _)| id)
     }
 
     pub fn block_by_name(&self, name: &str) -> Option<BlockId> {
-        self.blocks.iter().find(|(_, b)| b.name.eq_ignore_ascii_case(name)).map(|(&id, _)| id)
+        self.blocks
+            .iter()
+            .find(|(_, b)| b.name.eq_ignore_ascii_case(name))
+            .map(|(&id, _)| id)
     }
 
     /// Visible, editable layers.
     pub fn is_layer_editable(&self, id: LayerId) -> bool {
-        self.layer(id).is_some_and(|l| l.visible && !l.frozen && !l.locked)
+        self.layer(id)
+            .is_some_and(|l| l.visible && !l.frozen && !l.locked)
     }
 }

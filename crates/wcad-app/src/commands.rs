@@ -102,8 +102,8 @@ impl CommandRegistry {
         crate::tools::draw::register(&mut r);
         crate::tools::modify::register(&mut r);
         crate::tools::annotate::register(&mut r);
-        crate::modeling::register(&mut r);
         crate::panels::register_builtin(&mut r);
+        crate::modeling::register(&mut r);
         crate::panels::extra::register(&mut r);
         r
     }
@@ -223,6 +223,67 @@ mod tests {
             for a in c.aliases {
                 assert_eq!(*a, a.to_ascii_uppercase());
             }
+        }
+    }
+
+    #[test]
+    fn every_alias_resolves_to_its_own_command() {
+        let r = CommandRegistry::with_all_modules();
+        for command in r.commands() {
+            for alias in command.aliases {
+                assert_eq!(
+                    r.find(alias).map(|c| c.name),
+                    Some(command.name),
+                    "alias {alias} is shadowed"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn editing_annotation_and_modeling_commands_are_registered() {
+        let r = CommandRegistry::with_all_modules();
+        for name in [
+            "COPY",
+            "ROTATE",
+            "SCALE",
+            "MIRROR",
+            "ARRAYRECT",
+            "OFFSET",
+            "TRIM",
+            "EXTEND",
+            "FILLET",
+            "CHAMFER",
+            "BREAK",
+            "EXPLODE",
+            "JOIN",
+            "TEXT",
+            "MTEXT",
+            "DIMLINEAR",
+            "DIMALIGNED",
+            "DIMRADIUS",
+            "DIMDIAMETER",
+            "DIMANGULAR",
+            "DIMORDINATE",
+            "HATCH",
+            "BOX",
+            "CYLINDER",
+            "SPHERE",
+            "CONE",
+            "TORUS",
+            "UNION",
+            "SUBTRACT",
+            "INTERSECT",
+            "MEASURE3D",
+            "EXPORTSTL",
+            "EXPORTOBJ",
+            "EXPORTSTEP",
+            "EXTRUDE",
+            "REVOLVE",
+            "STYLE",
+            "DIMSTYLE",
+        ] {
+            assert!(r.find(name).is_some(), "missing command {name}");
         }
     }
 

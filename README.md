@@ -8,20 +8,40 @@
 
 **webcad** 是一个用 Rust 编写的 CAD 应用：二维绘图（类似 AutoCAD）、带几何/尺寸约束的参数化草图，以及基于特征历史的三维 B-rep 实体建模。同一套源码既编译成 WebAssembly 静态网站（GitHub Pages，任何设备的浏览器都能用，可离线），也编译成 Windows / Linux / macOS 桌面程序。
 
-> 状态：早期开发中。已包含二维几何、草图求解、实体建模和文件读写等模块，界面集成与完整功能仍在完善。
+> 状态：早期可用版本。下表列出的功能已有界面入口和交互测试；底层草图求解器已实现，但完整约束草图编辑界面等高级功能仍未完成。
 
-### 计划功能
+### 当前可用功能
 
-- **二维绘图**：直线、多段线、圆、圆弧、椭圆、样条、文字/多行文字、尺寸标注、图案填充、图块；图层、线型、颜色；修剪、延伸、偏移、圆角、倒角、阵列、镜像等编辑命令；对象捕捉、正交、极轴追踪；AutoCAD 风格命令行与命令别名（L、C、TR、O…）。
-- **参数化草图**：在基准面或实体面上绘制草图，支持重合、水平、竖直、平行、垂直、相切、相等、对称、距离、角度、半径等约束，显示自由度并诊断过约束/冲突。
-- **三维实体**：拉伸、旋转、圆角、倒角、布尔运算（并/差/交）、阵列、镜像、基本体；特征树可编辑、可回滚；精确 B-rep 内核失败时自动退回网格布尔运算。
-- **文件**：原生格式 `.wcad`（JSON，可 gzip 压缩为 `.wcadz`）；DXF / DWG 导入导出；SVG、PDF 导出；STL、OBJ、STEP 导出。
-- **界面**：中文（默认）与英文；首帧即可显示中文（内置字体，无需联网）；支持触摸（单指平移/旋转、双指缩放、长按菜单）。
-- **网页版**：单线程 WebAssembly（GitHub Pages 无法提供跨源隔离），Service Worker 离线缓存，可“添加到主屏幕”。
+| 类别 | 界面与命令 |
+| --- | --- |
+| 绘图 | LINE、PLINE、CIRCLE、ARC、RECTANG、POLYGON、ELLIPSE、SPLINE、POINT、DONUT、REVCLOUD |
+| 修改 | MOVE、ERASE、COPY、ROTATE、SCALE、MIRROR、ARRAYRECT、OFFSET、TRIM、EXTEND、FILLET、CHAMFER、BREAK、EXPLODE、JOIN |
+| 文字与标注 | TEXT、MTEXT；DIMLINEAR、DIMALIGNED、DIMRADIUS、DIMDIAMETER、DIMANGULAR、DIMORDINATE；HATCH 的 SOLID/ANSI31 填充；STYLE、DIMSTYLE 样式面板 |
+| 实体建模 | BOX、CYLINDER、SPHERE、CONE、TORUS；UNION、SUBTRACT、INTERSECT；封闭二维轮廓 EXTRUDE、REVOLVE，均有参数窗口 |
+| 模型管理 | 模型树重命名、压缩/解除、删除及依赖检查；基本体/布尔参数编辑；MEASURE3D；EXPORTSTL、EXPORTOBJ、EXPORTSTEP |
+| 绘图与文件管理 | 图层、颜色、线型、属性、对象捕捉、正交/极轴、撤销/重做；`.wcad`/`.wcadz` 保存与打开；DXF/DWG 导入导出；SVG/PDF 导出 |
+| 网页与界面 | 中文/英文、内置字体、桌面/窄屏布局、触摸导航、单线程 WebAssembly、Service Worker 离线缓存 |
+
+### 操作示例
+
+1. 新建空图后执行 `RECTANG`，输入 `0,0`、`40,20`；执行 `SELECTALL`、`EXTRUDE`，在窗口设置距离并点击“创建”。二维原图保留，草图与实体作为一次可撤销操作生成。
+2. 执行 `BOX` 设置尺寸和原点；再建立其他基本体。`UNION` 等布尔窗口必须选择目标和工具实体，不会无提示地修改最后一个实体。
+3. `TEXT` 依次输入插入点、高度、角度、正文；`DIMLINEAR` 输入两点及尺寸线位置。填充先选封闭边界，执行 `HATCH`，设置图案后 Enter 确认。`STYLE`/`DIMSTYLE` 打开样式面板，修改后点击“应用”。
+
+二维修改支持预选择或命令内选择；取消尚未确认的操作不写入文档。模型参数只有再生成功才提交，错误不会留下半个特征。Escape 可关闭建模窗口。空的功能标签不显示。
+
+### 尚未完成与限制
+
+- 完整约束草图编辑器、三维边圆角/倒角、三维阵列/镜像、图块创建与属性编辑等尚无完整交互入口；不能将内核测试通过等同于这些产品功能已完成。
+- 拉伸/旋转接受简单闭合线、圆、圆弧及 bulge 多段线，最多 2048 段；不接受椭圆、样条、开放或相交/接触边界。界面提供 XY/XZ/YZ 平面及世界轴，不提供任意面/轴选择。
+- 阵列为非关联世界 XY 矩形阵列，最多 10000 个实体；缩放仅为正等比。倒角仅支持直线，延伸不支持闭合曲线或样条。椭圆/样条偏移输出近似多段线。
+- 标注和填充不与源对象关联；HATCH 不提供内部点自动寻界。MTEXT 无自动折行且不继承文字样式的宽度/倾斜；文字镜像调整锚点和基线，不镜像字形轮廓。
+- 基本体窗口不提供放置旋转或实时几何预览；模型树只直接编辑基本体/布尔参数。存在依赖的删除/压缩会被拒绝，不自动级联删除。
+- 测量、STL、OBJ 使用细分网格；STEP 仅导出精确实体。布尔运算降级为网格时会明确提示，不假称精确 B-rep。
 
 ### 直接使用
 
-- 网页版：配置并成功部署 GitHub Pages 后，访问 `https://732857315.github.io/webcad/`。部署前可用 `cargo xtask serve` 本地预览。
+- 网页版：[https://risc.ink/webcad/](https://risc.ink/webcad/)，由 GitHub Pages 自动发布。也可用 `cargo xtask serve` 本地预览。
 - 桌面版：发布后从 [GitHub Releases](https://github.com/732857315/webcad/releases) 下载对应平台的压缩包（Windows `.zip`，Linux / macOS `.tar.gz`），解压后运行 `webcad`。
 
 ### 从源码构建
@@ -54,20 +74,40 @@ cargo run              # 直接运行桌面版
 
 **webcad** is a CAD application written in Rust: AutoCAD-style 2D drafting, parametric sketches with geometric and dimensional constraints, and feature-based 3D B-rep solid modeling. One source tree compiles to a WebAssembly static site (GitHub Pages; runs in any modern browser, works offline) and to native desktop programs for Windows, Linux and macOS.
 
-> Status: early development. Modules for 2D geometry, sketch solving, solid modeling and file I/O are present; UI integration and full functionality are still in progress.
+> Status: early usable version. The features below have application entry points and interaction tests. The sketch solver exists, but the full constraint-editing UI and other advanced features are not complete.
 
-### Planned features
+### Available features
 
-- **2D drafting**: lines, polylines, circles, arcs, ellipses, splines, text/mtext, dimensions, hatches, blocks; layers, linetypes, colors; trim, extend, offset, fillet, chamfer, array, mirror and more; object snaps, ortho, polar tracking; an AutoCAD-style command line with the usual aliases (L, C, TR, O, …).
-- **Parametric sketches** on planes or solid faces: coincident, horizontal, vertical, parallel, perpendicular, tangent, equal, symmetric, distance, angle, radius constraints, with degree-of-freedom display and over-constraint/conflict diagnosis.
-- **3D solids**: extrude, revolve, fillet, chamfer, booleans (union/subtract/intersect), patterns, mirror, primitives; an editable feature tree with rollback; automatic fallback to mesh booleans when the exact B-rep kernel fails.
-- **Files**: native `.wcad` (JSON, optionally gzip-compressed `.wcadz`); DXF/DWG import and export; SVG and PDF export; STL, OBJ and STEP export.
-- **UI**: Chinese (default) and English; Chinese text renders on the first frame with an embedded font (no network needed); touch support (one-finger pan/orbit, pinch zoom, long-press menu).
-- **Web build**: single-threaded WebAssembly (GitHub Pages cannot send cross-origin isolation headers), offline service worker, installable as a PWA.
+| Area | UI and commands |
+| --- | --- |
+| Drawing | LINE, PLINE, CIRCLE, ARC, RECTANG, POLYGON, ELLIPSE, SPLINE, POINT, DONUT, REVCLOUD |
+| Editing | MOVE, ERASE, COPY, ROTATE, SCALE, MIRROR, ARRAYRECT, OFFSET, TRIM, EXTEND, FILLET, CHAMFER, BREAK, EXPLODE, JOIN |
+| Annotation | TEXT, MTEXT; DIMLINEAR, DIMALIGNED, DIMRADIUS, DIMDIAMETER, DIMANGULAR, DIMORDINATE; SOLID/ANSI31 HATCH; STYLE and DIMSTYLE panel |
+| Modeling | BOX, CYLINDER, SPHERE, CONE, TORUS; UNION, SUBTRACT, INTERSECT; EXTRUDE and REVOLVE of closed 2D contours, with parameter dialogs |
+| Model management | Rename, suppress/restore and delete with dependency checks; primitive/boolean parameter editing; MEASURE3D; EXPORTSTL, EXPORTOBJ, EXPORTSTEP |
+| Drawing and files | Layers, colors, linetypes, properties, snaps, ortho/polar, undo/redo; native `.wcad`/compressed `.wcadz`; DXF/DWG import/export; SVG/PDF export |
+| Web and UI | Chinese/English, embedded font, desktop/narrow layouts, touch navigation, single-threaded WebAssembly, offline service worker |
+
+### Example workflows
+
+1. In an empty drawing, run `RECTANG`, enter `0,0` and `40,20`, then `SELECTALL` and `EXTRUDE`. Set the distance and click Create. The source drawing is retained; one undo removes both the generated sketch and solid feature.
+2. Run `BOX` to set dimensions and origin, then add other primitives. Boolean dialogs require explicit target and tool selection instead of silently modifying the last body.
+3. `TEXT` asks for insertion point, height, angle and content. `DIMLINEAR` takes two points and a dimension-line position. For `HATCH`, select closed boundaries, configure the pattern, then confirm with Enter. `STYLE`/`DIMSTYLE` edits use an explicit Apply button.
+
+2D editing accepts preselection or in-command selection. Cancellation does not commit unfinished work. Model changes commit only after successful regeneration, so failures do not leave partial features. Escape closes modeling dialogs. Empty ribbon tabs are hidden.
+
+### Remaining limitations
+
+- The full constraint-sketch editor, 3D edge fillet/chamfer, 3D patterns/mirror, and block creation/attribute editing do not yet have complete interactive entry points. Kernel support is not equivalent to a finished UI feature.
+- Extrude/revolve accepts at most 2048 segments of simple closed lines, circles, arcs and bulge polylines. Ellipses, splines, open, crossing or touching boundaries are rejected. The UI offers XY/XZ/YZ planes and world axes, not arbitrary face/axis picking.
+- Rectangular arrays are non-associative world-XY copies, capped at 10000 entities; scaling is positive and uniform. Chamfer is line-only; extend excludes closed curves and splines. Ellipse/spline offsets are approximate polylines.
+- Dimensions and hatches are not associative with their sources. Hatch has no interior-point boundary search. MTEXT does not auto-wrap or inherit style width/oblique settings. Text mirroring changes anchors and baselines, not glyph outlines.
+- Primitive dialogs have no placement-rotation controls or live geometry preview. Tree parameter editing covers primitives and booleans. Dependent features block deletion/suppression instead of being silently removed.
+- Measurement, STL and OBJ use tessellated meshes. STEP requires exact bodies. Boolean mesh fallback is reported explicitly rather than presented as exact B-rep.
 
 ### Use it
 
-- Web: after configuring and successfully deploying GitHub Pages, open `https://732857315.github.io/webcad/`. Before deployment, use `cargo xtask serve` for a local preview.
+- Web: [https://risc.ink/webcad/](https://risc.ink/webcad/), published through GitHub Pages. Use `cargo xtask serve` for a local preview.
 - Desktop: once a release is published, download the archive for your platform from [GitHub Releases](https://github.com/732857315/webcad/releases) (Windows `.zip`, Linux/macOS `.tar.gz`), unpack and run `webcad`.
 
 ### Build from source

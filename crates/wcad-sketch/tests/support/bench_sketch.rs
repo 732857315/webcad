@@ -34,7 +34,12 @@ pub fn build(n: usize) -> Built {
     let mut fixed = SkEntityId(0);
     for k in 0..n {
         let (w, h, r) = (4.0 + (k % 3) as f64, 3.0 + (k % 2) as f64, 1.0);
-        let c = [DVec2::new(x0, 0.0), DVec2::new(x0 + w, 0.0), DVec2::new(x0 + w, h), DVec2::new(x0, h)];
+        let c = [
+            DVec2::new(x0, 0.0),
+            DVec2::new(x0 + w, 0.0),
+            DVec2::new(x0 + w, h),
+            DVec2::new(x0, h),
+        ];
         let lines: [SkEntityId; 4] = [0, 1, 2, 3].map(|i| sk.add_line_points(c[i], c[(i + 1) % 4]));
         if k == 0 {
             first_lines = (lines[0], lines[2]);
@@ -48,8 +53,22 @@ pub fn build(n: usize) -> Built {
         add(&mut sk, K::Vertical { line: lines[1] });
         add(&mut sk, K::Vertical { line: lines[3] });
         let p = [0, 1, 2, 3].map(|i| end(&sk, lines[i]).0);
-        add(&mut sk, K::Distance { p1: p[0], p2: p[1], value: DimValue::new(w) });
-        heights.push(add(&mut sk, K::Distance { p1: p[1], p2: p[2], value: DimValue::new(h) }));
+        add(
+            &mut sk,
+            K::Distance {
+                p1: p[0],
+                p2: p[1],
+                value: DimValue::new(w),
+            },
+        );
+        heights.push(add(
+            &mut sk,
+            K::Distance {
+                p1: p[1],
+                p2: p[2],
+                value: DimValue::new(h),
+            },
+        ));
         match prev_br {
             None => {
                 fixed = p[0];
@@ -63,26 +82,52 @@ pub fn build(n: usize) -> Built {
         // quarter arc from the top-right corner, tangent to the right edge
         let tr = c[2];
         let arc = sk
-            .add_arc_center_start_end(DVec2::new(tr.x - r, tr.y), tr, DVec2::new(tr.x - r, tr.y + r))
+            .add_arc_center_start_end(
+                DVec2::new(tr.x - r, tr.y),
+                tr,
+                DVec2::new(tr.x - r, tr.y + r),
+            )
             .expect("arc");
         let [ac, as_, ae] = sk.arc_points(arc).expect("arc");
         add(&mut sk, K::Coincident { p1: as_, p2: p[2] });
-        add(&mut sk, K::TangentArcLine { arc, end: ArcEnd::Start, line: lines[1] });
-        add(&mut sk, K::Radius { round: arc, value: DimValue::new(r) });
+        add(
+            &mut sk,
+            K::TangentArcLine {
+                arc,
+                end: ArcEnd::Start,
+                line: lines[1],
+            },
+        );
+        add(
+            &mut sk,
+            K::Radius {
+                round: arc,
+                value: DimValue::new(r),
+            },
+        );
         add(&mut sk, K::VerticalPoints { p1: ac, p2: ae });
         if k == n / 2 {
             drag_pt = p[2];
         }
         x0 += w;
     }
-    Built { sk, heights, drag_pt, first_line: first_lines.0, third_line: first_lines.1, fixed }
+    Built {
+        sk,
+        heights,
+        drag_pt,
+        first_line: first_lines.0,
+        third_line: first_lines.1,
+        fixed,
+    }
 }
 
 /// Move every point except `fixed` by a pseudo-random offset in `[-amp, amp]²`.
 pub fn perturb(sk: &mut Sketch, amp: f64, seed: u64, fixed: SkEntityId) {
     let mut s = seed;
     let mut rnd = move || {
-        s = s.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        s = s
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         ((s >> 11) as f64 / (1u64 << 53) as f64 * 2.0 - 1.0) * amp
     };
     let ids: Vec<SkEntityId> = sk.entities.keys().copied().collect();

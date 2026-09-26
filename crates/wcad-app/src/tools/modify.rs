@@ -1,12 +1,11 @@
-//! Modify commands. **Owned by the modify feature package** (stub created by app-core).
-//!
-//! Add tools here and register them in [`register`] with
-//! `r.add(CommandSpec { name, aliases, label, icon, tab: Some(RibbonTab::…), group, kind: CommandKind::Tool(|| Box::new(MyTool::default())) })`.
-//! Object-pick prompts (TRIM/EXTEND/FILLET) should return `Accept::PICK` from `Tool::accepts` and
-//! resolve the clicked entity with `ToolCx::pick`.
-//! Put this module's UI strings in its own struct (see `crate::i18n` for the pattern).
+//! Undoable drawing transforms and curve editing tools.
+
+mod edit;
+mod transform;
 
 use crate::commands::CommandRegistry;
 
-/// Register this module's commands (currently none).
-pub fn register(_r: &mut CommandRegistry) {}
+pub fn register(r: &mut CommandRegistry) {
+    transform::register(r);
+    edit::register(r);
+}

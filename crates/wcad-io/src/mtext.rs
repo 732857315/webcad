@@ -18,7 +18,11 @@ pub(crate) fn percent_codes(s: &str) -> String {
                 Some('%') => out.push('%'),
                 Some('u') | Some('o') | Some('k') => {}
                 Some(d) if d.is_ascii_digit() => {
-                    let digits: String = chars[i + 2..].iter().take(3).take_while(|c| c.is_ascii_digit()).collect();
+                    let digits: String = chars[i + 2..]
+                        .iter()
+                        .take(3)
+                        .take_while(|c| c.is_ascii_digit())
+                        .collect();
                     if let Some(c) = digits.parse::<u32>().ok().and_then(char::from_u32) {
                         out.push(c);
                     }
@@ -117,7 +121,9 @@ pub(crate) fn mtext_plain(s: &str) -> String {
                     'L' | 'l' | 'O' | 'o' | 'K' | 'k' | 'N' => {}
                     'U' | 'u' if chars.get(i) == Some(&'+') => {
                         let hex: String = chars[i + 1..].iter().take(4).collect();
-                        if let Some(ch) = u32::from_str_radix(&hex, 16).ok().and_then(char::from_u32) {
+                        if let Some(ch) =
+                            u32::from_str_radix(&hex, 16).ok().and_then(char::from_u32)
+                        {
                             out.push(ch);
                             i += 5;
                         } else {
@@ -140,7 +146,8 @@ pub(crate) fn mtext_plain(s: &str) -> String {
                         out.push_str(part.trim());
                         i = (j + 1).min(chars.len());
                     }
-                    'f' | 'F' | 'H' | 'h' | 'W' | 'w' | 'Q' | 'q' | 'T' | 't' | 'A' | 'a' | 'C' | 'c' | 'p' => {
+                    'f' | 'F' | 'H' | 'h' | 'W' | 'w' | 'Q' | 'q' | 'T' | 't' | 'A' | 'a' | 'C'
+                    | 'c' | 'p' => {
                         // Argument terminated by ';'.
                         while i < chars.len() && chars[i] != ';' {
                             i += 1;
@@ -171,14 +178,23 @@ mod tests {
     #[test]
     fn strips_codes() {
         assert_eq!(mtext_plain("line1\\Pline2 中文"), "line1\nline2 中文");
-        assert_eq!(mtext_plain("{\\fArial|b0|i0;\\H2.5x;Big} \\C1;red"), "Big red");
+        assert_eq!(
+            mtext_plain("{\\fArial|b0|i0;\\H2.5x;Big} \\C1;red"),
+            "Big red"
+        );
         assert_eq!(mtext_plain("\\S1^2; in"), "1/2 in");
         assert_eq!(mtext_plain("a\\U+4E2Db"), "a中b");
         assert_eq!(mtext_plain("50%%d %%c10 %%p0.1"), "50° Ø10 ±0.1");
         assert_eq!(percent_codes("100%"), "100%");
         assert_eq!(mtext_plain("trailing\\"), "trailing");
-        assert_eq!(decode_unicode_escapes("a\\U+4E2D\\U+6587b \\\\U+4E2D \\P"), "a中文b \\\\U+4E2D \\P");
+        assert_eq!(
+            decode_unicode_escapes("a\\U+4E2D\\U+6587b \\\\U+4E2D \\P"),
+            "a中文b \\\\U+4E2D \\P"
+        );
         assert_eq!(encode_unicode_escapes("Ø中a"), "\\U+00D8\\U+4E2Da");
-        assert_eq!(decode_unicode_escapes(&encode_unicode_escapes("图层 A°")), "图层 A°");
+        assert_eq!(
+            decode_unicode_escapes(&encode_unicode_escapes("图层 A°")),
+            "图层 A°"
+        );
     }
 }

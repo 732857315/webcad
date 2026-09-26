@@ -101,7 +101,16 @@ fn path_data(path: &[Seg]) -> String {
                 cur = p;
             }
             Seg::Cubic(a, b, p) => {
-                let _ = write!(d, "C{} {} {} {} {} {}", num(a.x), num(a.y), num(b.x), num(b.y), num(p.x), num(p.y));
+                let _ = write!(
+                    d,
+                    "C{} {} {} {} {} {}",
+                    num(a.x),
+                    num(a.y),
+                    num(b.x),
+                    num(b.y),
+                    num(p.x),
+                    num(p.y)
+                );
                 cur = p;
             }
             Seg::Arc { c, u, v, t0, dt } => {
@@ -112,13 +121,21 @@ fn path_data(path: &[Seg]) -> String {
                     cur = end;
                     continue;
                 }
-                let sweep = if (dt > 0.0) == (cross2(u, v) > 0.0) { 1 } else { 0 };
+                let sweep = if (dt > 0.0) == (cross2(u, v) > 0.0) {
+                    1
+                } else {
+                    0
+                };
                 // A full turn cannot be one arc command: split into halves.
                 let pieces = if dt.abs() >= TAU - 1e-9 { 2 } else { 1 };
                 for i in 1..=pieces {
                     let t = t0 + dt * i as f64 / pieces as f64;
                     let p = arc_point(c, u, v, t);
-                    let large = if (dt.abs() / pieces as f64) > PI + 1e-12 { 1 } else { 0 };
+                    let large = if (dt.abs() / pieces as f64) > PI + 1e-12 {
+                        1
+                    } else {
+                        0
+                    };
                     let _ = write!(
                         d,
                         "A{} {} {} {} {} {} {}",
@@ -146,10 +163,19 @@ fn path_data(path: &[Seg]) -> String {
 /// Export the model space of `drawing` as a standalone SVG document.
 pub fn export(drawing: &Drawing, opts: &SvgOptions) -> String {
     let foreground = match opts.background {
-        Some([r, g, b]) if (0.2126 * r as f64 + 0.7152 * g as f64 + 0.0722 * b as f64) < 128.0 => [255, 255, 255],
+        Some([r, g, b]) if (0.2126 * r as f64 + 0.7152 * g as f64 + 0.0722 * b as f64) < 128.0 => {
+            [255, 255, 255]
+        }
         _ => [0, 0, 0],
     };
-    let scene = scene::build(drawing, SceneOptions { foreground, monochrome: opts.monochrome, plot_only: false });
+    let scene = scene::build(
+        drawing,
+        SceneOptions {
+            foreground,
+            monochrome: opts.monochrome,
+            plot_only: false,
+        },
+    );
     let (minx, miny, w, h) = match scene.bbox {
         Some(b) => {
             let size = b.max - b.min;
@@ -158,12 +184,30 @@ pub fn export(drawing: &Drawing, opts: &SvgOptions) -> String {
         None => (0.0, 0.0, 100.0, 100.0),
     };
     let extent = w.max(h).max(1e-9);
-    let margin = extent * if opts.margin.is_finite() { opts.margin.clamp(0.0, 1.0) } else { 0.02 };
-    let (vx, vy, vw, vh) = (minx - margin, -(miny + h + margin), w + 2.0 * margin, h + 2.0 * margin);
+    let margin = extent
+        * if opts.margin.is_finite() {
+            opts.margin.clamp(0.0, 1.0)
+        } else {
+            0.02
+        };
+    let (vx, vy, vw, vh) = (
+        minx - margin,
+        -(miny + h + margin),
+        w + 2.0 * margin,
+        h + 2.0 * margin,
+    );
     let (vw, vh) = (vw.max(extent * 1e-6), vh.max(extent * 1e-6));
-    let size_px = if opts.size_px.is_finite() && opts.size_px > 0.0 { opts.size_px } else { 1000.0 };
+    let size_px = if opts.size_px.is_finite() && opts.size_px > 0.0 {
+        opts.size_px
+    } else {
+        1000.0
+    };
     let k = size_px / vw.max(vh);
-    let stroke_scale = if opts.stroke_scale.is_finite() && opts.stroke_scale > 0.0 { opts.stroke_scale } else { 1.0 };
+    let stroke_scale = if opts.stroke_scale.is_finite() && opts.stroke_scale > 0.0 {
+        opts.stroke_scale
+    } else {
+        1.0
+    };
     let thin = extent / 1000.0 * stroke_scale;
 
     let mut s = String::with_capacity(1024 + scene.items.len() * 96);
@@ -193,7 +237,11 @@ pub fn export(drawing: &Drawing, opts: &SvgOptions) -> String {
     for item in &scene.items {
         match item {
             Item::Stroke { path, style } => {
-                let wmm = if opts.lineweights { style.weight_mm } else { scene::DEFAULT_WEIGHT_MM };
+                let wmm = if opts.lineweights {
+                    style.weight_mm
+                } else {
+                    scene::DEFAULT_WEIGHT_MM
+                };
                 let width = thin * (wmm / scene::DEFAULT_WEIGHT_MM).max(0.4);
                 let _ = write!(
                     s,
@@ -243,8 +291,12 @@ fn write_text(s: &mut String, t: &TextItem) {
         HAlign::Center => "middle",
         HAlign::Right => "end",
     };
-    let mut transform =
-        format!("translate({} {}) scale(1 -1) rotate({})", num(t.pos.x), num(t.pos.y), num(-t.rotation.to_degrees()));
+    let mut transform = format!(
+        "translate({} {}) scale(1 -1) rotate({})",
+        num(t.pos.x),
+        num(t.pos.y),
+        num(-t.rotation.to_degrees())
+    );
     if t.oblique.abs() > 1e-9 {
         let _ = write!(transform, " skewX({})", num(-t.oblique.to_degrees()));
     }
@@ -260,7 +312,12 @@ fn write_text(s: &mut String, t: &TextItem) {
     for (i, line) in lines.iter().enumerate() {
         // Local y points down after the flip; the first baseline is b0 above the anchor.
         let y = -b0 + pitch * i as f64;
-        let _ = write!(s, "<tspan x=\"0\" y=\"{}\">{}</tspan>", num(y), escape(line));
+        let _ = write!(
+            s,
+            "<tspan x=\"0\" y=\"{}\">{}</tspan>",
+            num(y),
+            escape(line)
+        );
     }
     s.push_str("</text>\n");
 }
@@ -283,13 +340,25 @@ mod tests {
         // Quarter circle CCW from (1,0) to (0,1).
         let p = vec![
             Seg::Move(DVec2::new(1.0, 0.0)),
-            Seg::Arc { c: DVec2::ZERO, u: DVec2::X, v: DVec2::Y, t0: 0.0, dt: std::f64::consts::FRAC_PI_2 },
+            Seg::Arc {
+                c: DVec2::ZERO,
+                u: DVec2::X,
+                v: DVec2::Y,
+                t0: 0.0,
+                dt: std::f64::consts::FRAC_PI_2,
+            },
         ];
         assert_eq!(path_data(&p), "M1 0A1 1 0 0 1 0 1");
         // Three quarters clockwise: large arc, sweep 0.
         let p = vec![
             Seg::Move(DVec2::new(1.0, 0.0)),
-            Seg::Arc { c: DVec2::ZERO, u: DVec2::X, v: DVec2::Y, t0: 0.0, dt: -1.5 * PI },
+            Seg::Arc {
+                c: DVec2::ZERO,
+                u: DVec2::X,
+                v: DVec2::Y,
+                t0: 0.0,
+                dt: -1.5 * PI,
+            },
         ];
         assert_eq!(path_data(&p), "M1 0A1 1 0 1 0 0 1");
     }

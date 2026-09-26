@@ -29,7 +29,7 @@ fn hue_ring(index: u8) -> [u8; 3] {
     let hue = (i / 10) as f64 * 15.0; // degrees
     let row = i % 10;
     let value = [1.0, 1.0, 0.8, 0.8, 0.6, 0.6, 0.5, 0.5, 0.3, 0.3][row as usize];
-    let sat = if row % 2 == 0 { 1.0 } else { 0.5 };
+    let sat = if row.is_multiple_of(2) { 1.0 } else { 0.5 };
     hsv_to_rgb(hue, sat, value)
 }
 

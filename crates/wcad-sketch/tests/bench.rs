@@ -39,7 +39,13 @@ fn big_chain_solves_and_diagnoses() {
     let mut sk = base.clone();
     let (a, _) = sk.line_ends(b.first_line).unwrap();
     let (c, _) = sk.line_ends(b.third_line).unwrap();
-    let bad = sk.add_constraint_checked(K::Distance { p1: a, p2: c, value: DimValue::new(1.0) }).unwrap();
+    let bad = sk
+        .add_constraint_checked(K::Distance {
+            p1: a,
+            p2: c,
+            value: DimValue::new(1.0),
+        })
+        .unwrap();
     assert!(!sk.solve().converged);
     let d = sk.diagnose();
     assert_eq!(d.conflicting_dependents, vec![bad], "{:?}", d.groups);
@@ -81,7 +87,10 @@ fn bench_timings() {
     let steps = 100;
     let t = Instant::now();
     for i in 1..=steps {
-        let rep = sk.drag(b.drag_pt, start + DVec2::new(0.0, 2.0 * i as f64 / steps as f64));
+        let rep = sk.drag(
+            b.drag_pt,
+            start + DVec2::new(0.0, 2.0 * i as f64 / steps as f64),
+        );
         assert!(rep.converged);
     }
     let drag_ms = t.elapsed().as_secs_f64() * 1e3 / steps as f64;

@@ -4,25 +4,29 @@ use std::collections::HashMap;
 use std::f64::consts::TAU;
 
 use acadrust::entities::dimension::{
-    Dimension as ADim, DimensionAligned, DimensionAngular3Pt, DimensionBase, DimensionDiameter, DimensionLinear,
-    DimensionOrdinate, DimensionRadius,
+    Dimension as ADim, DimensionAligned, DimensionAngular3Pt, DimensionBase, DimensionDiameter,
+    DimensionLinear, DimensionOrdinate, DimensionRadius,
 };
 use acadrust::entities::hatch::{
-    BoundaryEdge, BoundaryPath, CircularArcEdge, EllipticArcEdge, HatchPattern, HatchPatternLine, LineEdge,
-    PolylineEdge, SplineEdge,
+    BoundaryEdge, BoundaryPath, CircularArcEdge, EllipticArcEdge, HatchPattern, HatchPatternLine,
+    LineEdge, PolylineEdge, SplineEdge,
 };
 use acadrust::entities::mtext::AttachmentPoint;
 use acadrust::entities::text::{TextHorizontalAlignment, TextVerticalAlignment};
 use acadrust::entities::{
-    Arc as AArc, Circle as ACircle, Ellipse as AEllipse, EntityCommon, EntityType, Hatch as AHatch, Insert as AInsert,
-    Line as ALine, LwPolyline, MText as AMText, Point as APoint, Solid as ASolid, Spline as ASpline, Text as AText,
+    Arc as AArc, Circle as ACircle, Ellipse as AEllipse, EntityCommon, EntityType, Hatch as AHatch,
+    Insert as AInsert, Line as ALine, LwPolyline, MText as AMText, Point as APoint,
+    Solid as ASolid, Spline as ASpline, Text as AText,
 };
 use acadrust::tables::linetype::LineTypeElement;
-use acadrust::tables::{BlockRecord, DimStyle as ADimStyle, Layer as ALayer, LineType, TextStyle as ATextStyle};
+use acadrust::tables::{
+    BlockRecord, DimStyle as ADimStyle, Layer as ALayer, LineType, TextStyle as ATextStyle,
+};
 use acadrust::types::{DxfVersion as AVersion, Handle, Vector3};
 use acadrust::{CadDocument, TableEntry};
 use wcad_doc::{
-    Color, DimKind, Dimension, Document, Drawing, Entity, EntityKind, HAlign, Hatch, LineWeight, LinetypeRef, VAlign,
+    Color, DimKind, Dimension, Document, Drawing, Entity, EntityKind, HAlign, Hatch, LineWeight,
+    LinetypeRef, VAlign,
 };
 use wcad_geom2d::{Curve2, Nurbs2};
 use wcad_math::{DVec2, normalize_0_2pi};
@@ -50,17 +54,29 @@ struct Names<'a> {
 }
 
 fn enc_if(escape: bool, s: &str) -> String {
-    if escape { crate::mtext::encode_unicode_escapes(s) } else { s.to_string() }
+    if escape {
+        crate::mtext::encode_unicode_escapes(s)
+    } else {
+        s.to_string()
+    }
 }
 
-pub(crate) fn from_document(doc: &Document, version: DxfVersion, flavor: Flavor) -> Result<CadDocument> {
+pub(crate) fn from_document(
+    doc: &Document,
+    version: DxfVersion,
+    flavor: Flavor,
+) -> Result<CadDocument> {
     let d = &doc.drawing;
     let escape = matches!(version, DxfVersion::R2000 | DxfVersion::R2004);
     let enc = |s: &str| enc_if(escape, s);
     let mut cad = CadDocument::with_version(acad_version(version));
     cad.header.insertion_units = units_to(doc.meta.units);
     let lts = d.tables.settings.ltscale;
-    cad.header.linetype_scale = if lts.is_finite() && lts > 0.0 { lts } else { 1.0 };
+    cad.header.linetype_scale = if lts.is_finite() && lts > 0.0 {
+        lts
+    } else {
+        1.0
+    };
 
     // Linetypes.
     for lt in d.tables.linetypes.values() {
@@ -72,7 +88,10 @@ pub(crate) fn from_document(doc: &Document, version: DxfVersion, flavor: Flavor)
         a.description = enc(&lt.description);
         for &len in &lt.pattern {
             if len.is_finite() {
-                a.add_element(LineTypeElement { length: len, complex: None });
+                a.add_element(LineTypeElement {
+                    length: len,
+                    complex: None,
+                });
             }
         }
         a.pattern_length = lt.pattern_length();
@@ -82,7 +101,12 @@ pub(crate) fn from_document(doc: &Document, version: DxfVersion, flavor: Flavor)
 
     // Layers.
     for l in d.tables.layers.values() {
-        let linetype = d.tables.linetypes.get(&l.linetype).map(|t| enc(&t.name)).unwrap_or_else(|| "Continuous".into());
+        let linetype = d
+            .tables
+            .linetypes
+            .get(&l.linetype)
+            .map(|t| enc(&t.name))
+            .unwrap_or_else(|| "Continuous".into());
         let color = match l.color {
             Color::ByLayer | Color::ByBlock => color_to(Color::WHITE),
             c => color_to(c),
@@ -118,8 +142,16 @@ pub(crate) fn from_document(doc: &Document, version: DxfVersion, flavor: Flavor)
             Flavor::Dwg => s.oblique,
         };
         let apply = |a: &mut ATextStyle| {
-            a.height = if s.height.is_finite() && s.height > 0.0 { s.height } else { 0.0 };
-            a.width_factor = if s.width_factor.is_finite() && s.width_factor > 0.0 { s.width_factor } else { 1.0 };
+            a.height = if s.height.is_finite() && s.height > 0.0 {
+                s.height
+            } else {
+                0.0
+            };
+            a.width_factor = if s.width_factor.is_finite() && s.width_factor > 0.0 {
+                s.width_factor
+            } else {
+                1.0
+            };
             a.oblique_angle = if oblique.is_finite() { oblique } else { 0.0 };
             if s.font.eq_ignore_ascii_case("default") || s.font.is_empty() {
                 // AutoCAD's default shape font plus the Simplified Chinese big font.
@@ -143,9 +175,17 @@ pub(crate) fn from_document(doc: &Document, version: DxfVersion, flavor: Flavor)
 
     // Dimension styles.
     for s in d.tables.dim_styles.values() {
-        let text_style =
-            d.tables.text_styles.get(&s.text_style).map(|t| enc(&t.name)).unwrap_or_else(|| "Standard".into());
-        let text_style_handle = cad.text_styles.get(&text_style).map(|t| t.handle()).unwrap_or(Handle::NULL);
+        let text_style = d
+            .tables
+            .text_styles
+            .get(&s.text_style)
+            .map(|t| enc(&t.name))
+            .unwrap_or_else(|| "Standard".into());
+        let text_style_handle = cad
+            .text_styles
+            .get(&text_style)
+            .map(|t| t.handle())
+            .unwrap_or(Handle::NULL);
         let apply = |a: &mut ADimStyle| {
             a.dimtxt = s.text_height;
             a.dimasz = s.arrow_size;
@@ -177,11 +217,19 @@ pub(crate) fn from_document(doc: &Document, version: DxfVersion, flavor: Flavor)
     }
 
     // Blocks. Base points are folded into the geometry (acadrust's DXF writer drops them).
-    let mut names = Names { drawing: d, flavor, escape, blocks: HashMap::new() };
+    let mut names = Names {
+        drawing: d,
+        flavor,
+        escape,
+        blocks: HashMap::new(),
+    };
     let mut records = Vec::new();
     for (&id, b) in &d.blocks {
         let upper = b.name.to_ascii_uppercase();
-        if b.name.is_empty() || upper.starts_with("*MODEL_SPACE") || upper.starts_with("*PAPER_SPACE") {
+        if b.name.is_empty()
+            || upper.starts_with("*MODEL_SPACE")
+            || upper.starts_with("*PAPER_SPACE")
+        {
             continue;
         }
         let name = enc(&b.name);
@@ -193,7 +241,10 @@ pub(crate) fn from_document(doc: &Document, version: DxfVersion, flavor: Flavor)
         br.set_handle(h);
         br.block_entity_handle = cad.allocate_handle();
         br.block_end_handle = cad.allocate_handle();
-        cad.block_records.add(br).map_err(|m| Error::Write { format: "block table", message: m })?;
+        cad.block_records.add(br).map_err(|m| Error::Write {
+            format: "block table",
+            message: m,
+        })?;
         names.blocks.insert(id, name);
         records.push((h, b));
     }
@@ -220,7 +271,9 @@ fn add_entity(
     owner: Option<Handle>,
     dims: &mut usize,
 ) -> Result<()> {
-    let Some(mut ae) = names.entity(e) else { return Ok(()) };
+    let Some(mut ae) = names.entity(e) else {
+        return Ok(());
+    };
     if let (EntityKind::Dimension(d), EntityType::Dimension(ad)) = (&e.kind, &mut ae)
         && let Some(style) = names.drawing.tables.dim_styles.get(&d.style)
         && let Some(name) = dim_block(cad, names, d, style, dims)?
@@ -230,7 +283,10 @@ fn add_entity(
     if let Some(h) = owner {
         ae.common_mut().owner_handle = h;
     }
-    cad.add_entity(ae).map_err(|err| Error::Write { format: "entity", message: err.to_string() })?;
+    cad.add_entity(ae).map_err(|err| Error::Write {
+        format: "entity",
+        message: err.to_string(),
+    })?;
     Ok(())
 }
 
@@ -243,7 +299,9 @@ fn dim_block(
     style: &wcad_doc::DimStyle,
     counter: &mut usize,
 ) -> Result<Option<String>> {
-    let Some(g) = dimgeom::build(d, style) else { return Ok(None) };
+    let Some(g) = dimgeom::build(d, style) else {
+        return Ok(None);
+    };
     let name = loop {
         *counter += 1;
         let n = format!("*D{counter}");
@@ -257,10 +315,15 @@ fn dim_block(
     br.set_handle(h);
     br.block_entity_handle = cad.allocate_handle();
     br.block_end_handle = cad.allocate_handle();
-    cad.block_records.add(br).map_err(|m| Error::Write { format: "dimension block", message: m })?;
+    cad.block_records.add(br).map_err(|m| Error::Write {
+        format: "dimension block",
+        message: m,
+    })?;
     let mut parts: Vec<EntityType> = Vec::new();
     for (a, b) in &g.lines {
-        parts.push(EntityType::Line(ALine::from_coords(a.x, a.y, 0.0, b.x, b.y, 0.0)));
+        parts.push(EntityType::Line(ALine::from_coords(
+            a.x, a.y, 0.0, b.x, b.y, 0.0,
+        )));
     }
     for arc in &g.arcs {
         parts.push(EntityType::Arc(AArc::from_coords(
@@ -273,7 +336,12 @@ fn dim_block(
         )));
     }
     for t in &g.arrows {
-        parts.push(EntityType::Solid(ASolid::new(a3(t[0]), a3(t[1]), a3(t[2]), a3(t[2]))));
+        parts.push(EntityType::Solid(ASolid::new(
+            a3(t[0]),
+            a3(t[1]),
+            a3(t[2]),
+            a3(t[2]),
+        )));
     }
     if !g.text.is_empty() {
         let mut m = AMText::with_value(names.enc(&g.text), a3(g.text_pos));
@@ -300,7 +368,10 @@ fn dim_block(
         c.color = acadrust::types::Color::ByBlock;
         c.line_weight = acadrust::types::LineWeight::ByBlock;
         c.linetype = "ByBlock".into();
-        cad.add_entity(p).map_err(|err| Error::Write { format: "dimension block", message: err.to_string() })?;
+        cad.add_entity(p).map_err(|err| Error::Write {
+            format: "dimension block",
+            message: err.to_string(),
+        })?;
     }
     Ok(Some(name))
 }
@@ -309,14 +380,26 @@ impl Names<'_> {
     fn common(&self, e: &Entity) -> EntityCommon {
         let t = &self.drawing.tables;
         let mut c = EntityCommon::new();
-        c.layer = t.layers.get(&e.layer).map(|l| self.enc(&l.name)).unwrap_or_else(|| "0".into());
+        c.layer = t
+            .layers
+            .get(&e.layer)
+            .map(|l| self.enc(&l.name))
+            .unwrap_or_else(|| "0".into());
         c.color = color_to(e.color);
         c.linetype = match e.linetype {
             LinetypeRef::ByLayer => "ByLayer".into(),
             LinetypeRef::ByBlock => "ByBlock".into(),
-            LinetypeRef::Id(id) => t.linetypes.get(&id).map(|l| self.enc(&l.name)).unwrap_or_else(|| "ByLayer".into()),
+            LinetypeRef::Id(id) => t
+                .linetypes
+                .get(&id)
+                .map(|l| self.enc(&l.name))
+                .unwrap_or_else(|| "ByLayer".into()),
         };
-        c.linetype_scale = if e.linetype_scale.is_finite() && e.linetype_scale > 0.0 { e.linetype_scale } else { 1.0 };
+        c.linetype_scale = if e.linetype_scale.is_finite() && e.linetype_scale > 0.0 {
+            e.linetype_scale
+        } else {
+            1.0
+        };
         c.line_weight = lineweight_to(e.lineweight);
         c
     }
@@ -326,15 +409,24 @@ impl Names<'_> {
     }
 
     fn style_name(&self, id: wcad_doc::TextStyleId) -> String {
-        self.drawing.tables.text_styles.get(&id).map(|s| self.enc(&s.name)).unwrap_or_else(|| "Standard".into())
+        self.drawing
+            .tables
+            .text_styles
+            .get(&id)
+            .map(|s| self.enc(&s.name))
+            .unwrap_or_else(|| "Standard".into())
     }
 
     fn entity(&self, e: &Entity) -> Option<EntityType> {
         let common = self.common(e);
         let mut out = match &e.kind {
             EntityKind::Point { p } => EntityType::Point(APoint::from_coords(p.x, p.y, 0.0)),
-            EntityKind::Line(l) => EntityType::Line(ALine::from_coords(l.a.x, l.a.y, 0.0, l.b.x, l.b.y, 0.0)),
-            EntityKind::Circle(c) => EntityType::Circle(ACircle::from_coords(c.c.x, c.c.y, 0.0, c.r)),
+            EntityKind::Line(l) => {
+                EntityType::Line(ALine::from_coords(l.a.x, l.a.y, 0.0, l.b.x, l.b.y, 0.0))
+            }
+            EntityKind::Circle(c) => {
+                EntityType::Circle(ACircle::from_coords(c.c.x, c.c.y, 0.0, c.r))
+            }
             EntityKind::Arc(a) => EntityType::Arc(AArc::from_coords(
                 a.c.x,
                 a.c.y,
@@ -344,7 +436,8 @@ impl Names<'_> {
                 normalize_0_2pi(a.end),
             )),
             EntityKind::Ellipse(el) => {
-                let mut a = AEllipse::from_center_axes(a3(el.c), a3(el.major), el.ratio.clamp(1e-6, 1.0));
+                let mut a =
+                    AEllipse::from_center_axes(a3(el.c), a3(el.major), el.ratio.clamp(1e-6, 1.0));
                 if el.is_full() {
                     a.start_parameter = 0.0;
                     a.end_parameter = TAU;
@@ -395,7 +488,11 @@ impl Names<'_> {
                 a.rectangle_width = m.width.max(0.0);
                 a.rotation = m.rotation;
                 a.style = self.style_name(m.style);
-                a.line_spacing_factor = if m.line_spacing > 0.0 { m.line_spacing } else { 1.0 };
+                a.line_spacing_factor = if m.line_spacing > 0.0 {
+                    m.line_spacing
+                } else {
+                    1.0
+                };
                 a.attachment_point = attachment(m.attachment);
                 EntityType::MText(a)
             }
@@ -404,8 +501,16 @@ impl Names<'_> {
             EntityKind::Insert(i) => {
                 let name = self.blocks.get(&i.block)?;
                 let mut a = AInsert::new(name.clone(), a3(i.pos));
-                a.set_x_scale(if i.scale.x.is_finite() && i.scale.x != 0.0 { i.scale.x } else { 1.0 });
-                a.set_y_scale(if i.scale.y.is_finite() && i.scale.y != 0.0 { i.scale.y } else { 1.0 });
+                a.set_x_scale(if i.scale.x.is_finite() && i.scale.x != 0.0 {
+                    i.scale.x
+                } else {
+                    1.0
+                });
+                a.set_y_scale(if i.scale.y.is_finite() && i.scale.y != 0.0 {
+                    i.scale.y
+                } else {
+                    1.0
+                });
                 a.rotation = i.rotation;
                 EntityType::Insert(a)
             }
@@ -421,10 +526,17 @@ impl Names<'_> {
 
     fn dimension(&self, d: &Dimension) -> ADim {
         let style = self.drawing.tables.dim_styles.get(&d.style);
-        let style_name = style.map(|s| self.enc(&s.name)).unwrap_or_else(|| "Standard".into());
+        let style_name = style
+            .map(|s| self.enc(&s.name))
+            .unwrap_or_else(|| "Standard".into());
         let measurement = dimgeom::measure(&d.kind);
         let mut dim = match d.kind {
-            DimKind::Linear { p1, p2, line_point, rotation } => {
+            DimKind::Linear {
+                p1,
+                p2,
+                line_point,
+                rotation,
+            } => {
                 let mut x = DimensionLinear::rotated(a3(p1), a3(p2), rotation);
                 x.definition_point = a3(line_point);
                 ADim::Linear(x)
@@ -434,16 +546,28 @@ impl Names<'_> {
                 x.definition_point = a3(line_point);
                 ADim::Aligned(x)
             }
-            DimKind::Radius { center, point } => ADim::Radius(DimensionRadius::new(a3(center), a3(point))),
+            DimKind::Radius { center, point } => {
+                ADim::Radius(DimensionRadius::new(a3(center), a3(point)))
+            }
             DimKind::Diameter { center, point } => {
                 ADim::Diameter(DimensionDiameter::new(a3(point), a3(center * 2.0 - point)))
             }
-            DimKind::Angular { vertex, p1, p2, arc_point } => {
+            DimKind::Angular {
+                vertex,
+                p1,
+                p2,
+                arc_point,
+            } => {
                 let mut x = DimensionAngular3Pt::new(a3(vertex), a3(p1), a3(p2));
                 x.definition_point = a3(arc_point);
                 ADim::Angular3Pt(x)
             }
-            DimKind::Ordinate { origin, point, leader_end, x_axis } => {
+            DimKind::Ordinate {
+                origin,
+                point,
+                leader_end,
+                x_axis,
+            } => {
                 let mut x = DimensionOrdinate::new(a3(point), a3(leader_end), x_axis);
                 x.definition_point = a3(origin);
                 x.refresh_measurement();
@@ -462,7 +586,12 @@ impl Names<'_> {
             DimKind::Angular { .. } => measurement.to_degrees(),
             _ => measurement,
         };
-        base.set_text_override(d.text_override.as_deref().filter(|t| !t.is_empty()).map(|t| self.enc(t)));
+        base.set_text_override(
+            d.text_override
+                .as_deref()
+                .filter(|t| !t.is_empty())
+                .map(|t| self.enc(t)),
+        );
         let text_mid = match (d.text_pos, style) {
             (Some(p), _) => p,
             (None, Some(s)) => dimgeom::default_text_pos(d, s),
@@ -478,8 +607,16 @@ impl Names<'_> {
             AHatch::solid()
         } else {
             let mut pat = HatchPattern::new(h.pattern.name.clone());
-            let scale = if h.pattern.scale.is_finite() && h.pattern.scale > 0.0 { h.pattern.scale } else { 1.0 };
-            for f in pattern::families(&pattern::lines_or_default(&h.pattern.name), h.pattern.angle, scale) {
+            let scale = if h.pattern.scale.is_finite() && h.pattern.scale > 0.0 {
+                h.pattern.scale
+            } else {
+                1.0
+            };
+            for f in pattern::families(
+                &pattern::lines_or_default(&h.pattern.name),
+                h.pattern.angle,
+                scale,
+            ) {
                 pat.add_line(HatchPatternLine {
                     angle: f.dir.y.atan2(f.dir.x),
                     base_point: a2(f.base),
@@ -510,8 +647,15 @@ impl Names<'_> {
         if let [Curve2::Polyline(p)] = curves
             && p.verts.len() >= 2
         {
-            let verts = p.verts.iter().map(|v| Vector3::new(v.p.x, v.p.y, v.bulge)).collect();
-            path.add_edge(BoundaryEdge::Polyline(PolylineEdge { vertices: verts, is_closed: true }));
+            let verts = p
+                .verts
+                .iter()
+                .map(|v| Vector3::new(v.p.x, v.p.y, v.bulge))
+                .collect();
+            path.add_edge(BoundaryEdge::Polyline(PolylineEdge {
+                vertices: verts,
+                is_closed: true,
+            }));
             return path;
         }
         // Otherwise: an edge path, keeping the chain head-to-tail.
@@ -530,7 +674,10 @@ impl Names<'_> {
             match c {
                 Curve2::Line(l) => {
                     let (a, b) = if reversed { (l.b, l.a) } else { (l.a, l.b) };
-                    path.add_edge(BoundaryEdge::Line(LineEdge { start: a2(a), end: a2(b) }));
+                    path.add_edge(BoundaryEdge::Line(LineEdge {
+                        start: a2(a),
+                        end: a2(b),
+                    }));
                 }
                 Curve2::Arc(arc) => {
                     let (start, end) = (arc.start, arc.start + arc.sweep());
@@ -561,8 +708,11 @@ impl Names<'_> {
                 })),
                 Curve2::Ellipse(el) => {
                     let full = el.is_full();
-                    let (ps, pe) =
-                        if full { (0.0, TAU) } else { (el.start, el.start + wcad_math::ccw_sweep(el.start, el.end)) };
+                    let (ps, pe) = if full {
+                        (0.0, TAU)
+                    } else {
+                        (el.start, el.start + wcad_math::ccw_sweep(el.start, el.end))
+                    };
                     let (mut s, mut e) = if full {
                         (0.0, TAU)
                     } else {
@@ -606,7 +756,9 @@ impl Names<'_> {
                             .ctrl
                             .iter()
                             .enumerate()
-                            .map(|(i, p)| Vector3::new(p.x, p.y, if rational { sp.weights[i] } else { 1.0 }))
+                            .map(|(i, p)| {
+                                Vector3::new(p.x, p.y, if rational { sp.weights[i] } else { 1.0 })
+                            })
                             .collect(),
                         fit_points: sp.fit_points.iter().map(|p| a2(*p)).collect(),
                         start_tangent: acadrust::types::Vector2::new(0.0, 0.0),
@@ -675,7 +827,11 @@ fn spline(s: &Nurbs2) -> Option<ASpline> {
     a.fit_points = s.fit_points.iter().map(|q| a3(*q)).collect();
     if s.ctrl.len() > p {
         a.control_points = s.ctrl.iter().map(|q| a3(*q)).collect();
-        a.knots = if s.knots.len() == s.ctrl.len() + p + 1 { s.knots.clone() } else { clamped_knots(p, s.ctrl.len()) };
+        a.knots = if s.knots.len() == s.ctrl.len() + p + 1 {
+            s.knots.clone()
+        } else {
+            clamped_knots(p, s.ctrl.len())
+        };
         if !s.weights.is_empty() && s.weights.len() == s.ctrl.len() {
             a.weights = s.weights.clone();
             a.flags.rational = true;
@@ -724,7 +880,10 @@ fn translate(kind: &mut EntityKind, d: DVec2) {
         EntityKind::Insert(i) => i.pos += d,
         EntityKind::Dimension(dim) => {
             match &mut dim.kind {
-                DimKind::Linear { p1, p2, line_point, .. } | DimKind::Aligned { p1, p2, line_point } => {
+                DimKind::Linear {
+                    p1, p2, line_point, ..
+                }
+                | DimKind::Aligned { p1, p2, line_point } => {
                     *p1 += d;
                     *p2 += d;
                     *line_point += d;
@@ -733,13 +892,23 @@ fn translate(kind: &mut EntityKind, d: DVec2) {
                     *center += d;
                     *point += d;
                 }
-                DimKind::Angular { vertex, p1, p2, arc_point } => {
+                DimKind::Angular {
+                    vertex,
+                    p1,
+                    p2,
+                    arc_point,
+                } => {
                     *vertex += d;
                     *p1 += d;
                     *p2 += d;
                     *arc_point += d;
                 }
-                DimKind::Ordinate { origin, point, leader_end, .. } => {
+                DimKind::Ordinate {
+                    origin,
+                    point,
+                    leader_end,
+                    ..
+                } => {
                     *origin += d;
                     *point += d;
                     *leader_end += d;
